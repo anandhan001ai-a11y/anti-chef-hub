@@ -15,6 +15,7 @@ import {
 type SidebarProps = {
   activeSection: string;
   setActiveSection: (section: string) => void;
+  chefName?: string;
 };
 
 const menuItems = [
@@ -31,7 +32,7 @@ const menuItems = [
   { id: 'settings', icon: Settings, label: 'Settings' },
 ];
 
-export default function Sidebar({ activeSection, setActiveSection }: SidebarProps) {
+export default function Sidebar({ activeSection, setActiveSection, chefName }: SidebarProps) {
   return (
     <aside className="w-20 lg:w-64 bg-card-bg h-screen fixed left-0 top-0 border-r border-gray-200 transition-all duration-300">
       <div className="p-6 border-b border-gray-200">
@@ -41,7 +42,11 @@ export default function Sidebar({ activeSection, setActiveSection }: SidebarProp
           </div>
           <div className="hidden lg:block">
             <h1 className="font-bold text-lg">ChefAnand Hub</h1>
-            <p className="text-xs text-gray-500">Kitchen Management</p>
+            {chefName ? (
+              <p className="text-xs text-neon-blue font-medium">Chef {chefName}</p>
+            ) : (
+              <p className="text-xs text-gray-500">Kitchen Management</p>
+            )}
           </div>
         </div>
       </div>

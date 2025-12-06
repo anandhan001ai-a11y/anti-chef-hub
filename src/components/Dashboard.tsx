@@ -8,7 +8,11 @@ import Calendar from './Calendar';
 import AddTaskModal from './AddTaskModal';
 import TaskDetailDrawer from './TaskDetailDrawer';
 
-export default function Dashboard() {
+type DashboardProps = {
+  chefName: string;
+};
+
+export default function Dashboard({ chefName }: DashboardProps) {
   const [activeSection, setActiveSection] = useState('dashboard');
   const [activeFilter, setActiveFilter] = useState('Full Year');
   const [searchQuery, setSearchQuery] = useState('');
@@ -29,6 +33,14 @@ export default function Dashboard() {
 
   const handleDateClick = (date: Date) => {
     handleAddTask(date);
+  };
+
+  const getTimeBasedGreeting = () => {
+    const hour = new Date().getHours();
+    if (hour < 12) return 'Good Morning';
+    if (hour < 17) return 'Good Afternoon';
+    if (hour < 21) return 'Good Evening';
+    return 'Good Night';
   };
 
   const renderMainContent = () => {
@@ -86,7 +98,11 @@ export default function Dashboard() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <Sidebar activeSection={activeSection} setActiveSection={setActiveSection} />
+      <Sidebar
+        activeSection={activeSection}
+        setActiveSection={setActiveSection}
+        chefName={chefName}
+      />
 
       <div className="ml-20 lg:ml-64 transition-all duration-300">
         <TopNav
@@ -99,7 +115,11 @@ export default function Dashboard() {
 
         <main className="p-6">
           <div className="mb-6">
-            <h1 className="text-3xl font-bold">Chef Tools Dashboard</h1>
+            <div className="flex items-center gap-4 mb-2">
+              <h1 className="text-3xl font-bold">
+                {getTimeBasedGreeting()}, <span className="bg-gradient-to-r from-neon-blue to-neon-violet bg-clip-text text-transparent">Chef {chefName}</span>
+              </h1>
+            </div>
             <p className="text-gray-500 mt-1">
               Manage and track all kitchen workflows in one interface.
             </p>
