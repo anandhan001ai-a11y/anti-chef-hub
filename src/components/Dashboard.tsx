@@ -48,14 +48,12 @@ export default function Dashboard({ chefName }: DashboardProps) {
     switch (activeSection) {
       case 'dashboard':
         return (
-          <div className="space-y-6">
-            <div>
-              <h2 className="text-xl font-bold mb-4">Task Board</h2>
-              <KanbanBoard onTaskClick={handleTaskClick} searchQuery={searchQuery} />
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 h-full">
+            <div className="lg:col-span-1">
+              <TodoList onTaskClick={handleTaskClick} searchQuery={searchQuery} />
             </div>
-            <div>
-              <h2 className="text-xl font-bold mb-4">Cleaning Board</h2>
-              <CleaningTaskBoard />
+            <div className="lg:col-span-2">
+              <KanbanBoard onTaskClick={handleTaskClick} searchQuery={searchQuery} />
             </div>
           </div>
         );
@@ -90,14 +88,12 @@ export default function Dashboard({ chefName }: DashboardProps) {
 
       default:
         return (
-          <div className="space-y-6">
-            <div>
-              <h2 className="text-xl font-bold mb-4">Task Board</h2>
-              <KanbanBoard onTaskClick={handleTaskClick} searchQuery={searchQuery} />
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 h-full">
+            <div className="lg:col-span-1">
+              <TodoList onTaskClick={handleTaskClick} searchQuery={searchQuery} />
             </div>
-            <div>
-              <h2 className="text-xl font-bold mb-4">Cleaning Board</h2>
-              <CleaningTaskBoard />
+            <div className="lg:col-span-2">
+              <KanbanBoard onTaskClick={handleTaskClick} searchQuery={searchQuery} />
             </div>
           </div>
         );
@@ -138,13 +134,9 @@ export default function Dashboard({ chefName }: DashboardProps) {
           {activeFilter === 'Full Year' && activeSection === 'dashboard' ? (
             <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
               <div className="xl:col-span-2 space-y-6">
-                <div>
-                  <h2 className="text-xl font-bold mb-4">Task Board</h2>
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                  <TodoList onTaskClick={handleTaskClick} searchQuery={searchQuery} />
                   <KanbanBoard onTaskClick={handleTaskClick} searchQuery={searchQuery} />
-                </div>
-                <div>
-                  <h2 className="text-xl font-bold mb-4">Cleaning Board</h2>
-                  <CleaningTaskBoard />
                 </div>
               </div>
               <div>
