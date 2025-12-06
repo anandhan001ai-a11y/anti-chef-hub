@@ -1,16 +1,4 @@
-import {
-  LayoutDashboard,
-  CheckSquare,
-  Columns,
-  Calculator,
-  Scale,
-  DollarSign,
-  Package,
-  ClipboardCheck,
-  ChefHat,
-  Upload,
-  Settings
-} from 'lucide-react';
+import { LayoutDashboard, CheckSquare, Columns2 as Columns, Calculator, Scale, DollarSign, Package, ClipboardCheck, ChefHat, Upload, Settings } from 'lucide-react';
 
 type SidebarProps = {
   activeSection: string;
