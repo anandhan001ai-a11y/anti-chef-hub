@@ -32,7 +32,7 @@ export default function Sidebar({ activeSection, setActiveSection, chefName }: S
           <div className="hidden lg:block">
             <h1 className="font-bold text-lg">ChefAnand Hub</h1>
             {chefName ? (
-              <p className="text-xs text-neon-blue font-medium">Chef {chefName}</p>
+              <p className="text-xs text-neon-blue font-medium">{chefName}</p>
             ) : (
               <p className="text-xs text-gray-500">Kitchen Management</p>
             )}
