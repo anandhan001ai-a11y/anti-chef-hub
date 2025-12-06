@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { TaskProvider } from './contexts/TaskContext';
+import { CleaningTaskProvider } from './contexts/CleaningTaskContext';
 import Dashboard from './components/Dashboard';
 import Login from './components/Login';
 
@@ -27,7 +28,9 @@ function App() {
 
   return (
     <TaskProvider>
-      <Dashboard chefName={chefName} />
+      <CleaningTaskProvider>
+        <Dashboard chefName={chefName} />
+      </CleaningTaskProvider>
     </TaskProvider>
   );
 }

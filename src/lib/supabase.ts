@@ -45,3 +45,22 @@ export type CalendarEvent = {
   event_type: 'holiday' | 'cultural' | 'deadline' | 'special';
   description: string;
 };
+
+export type TaskSectionKey = 'shift' | 'endOfDay' | 'weekly' | 'monthly';
+
+export type CleaningTask = {
+  id: string;
+  text: string;
+  completed: boolean;
+  section: TaskSectionKey;
+  position: number;
+  created_at: string;
+  updated_at: string;
+};
+
+export type CleaningSupply = {
+  id: string;
+  name: string;
+  position: number;
+  created_at: string;
+};

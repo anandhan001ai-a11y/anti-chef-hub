@@ -7,6 +7,7 @@ import KanbanBoard from './KanbanBoard';
 import Calendar from './Calendar';
 import AddTaskModal from './AddTaskModal';
 import TaskDetailDrawer from './TaskDetailDrawer';
+import CleaningTaskBoard from './cleaning/CleaningTaskBoard';
 
 type DashboardProps = {
   chefName: string;
@@ -67,6 +68,9 @@ export default function Dashboard({ chefName }: DashboardProps) {
       case 'board':
         return <KanbanBoard onTaskClick={handleTaskClick} searchQuery={searchQuery} />;
 
+      case 'cleaning':
+        return <CleaningTaskBoard />;
+
       case 'conversions':
       case 'scaling':
       case 'costing':
@@ -113,17 +117,19 @@ export default function Dashboard({ chefName }: DashboardProps) {
           onAddTask={() => handleAddTask()}
         />
 
-        <main className="p-6">
-          <div className="mb-6">
-            <div className="flex items-center gap-4 mb-2">
-              <h1 className="text-3xl font-bold">
-                {getTimeBasedGreeting()}, <span className="bg-gradient-to-r from-neon-blue to-neon-violet bg-clip-text text-transparent">Chef {chefName}</span>
-              </h1>
+        <main className={activeSection === 'cleaning' ? '' : 'p-6'}>
+          {activeSection !== 'cleaning' && (
+            <div className="mb-6">
+              <div className="flex items-center gap-4 mb-2">
+                <h1 className="text-3xl font-bold">
+                  {getTimeBasedGreeting()}, <span className="bg-gradient-to-r from-neon-blue to-neon-violet bg-clip-text text-transparent">Chef {chefName}</span>
+                </h1>
+              </div>
+              <p className="text-gray-500 mt-1">
+                Manage and track all kitchen workflows in one interface.
+              </p>
             </div>
-            <p className="text-gray-500 mt-1">
-              Manage and track all kitchen workflows in one interface.
-            </p>
-          </div>
+          )}
 
           {activeFilter === 'Full Year' && activeSection === 'dashboard' ? (
             <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">

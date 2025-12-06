@@ -1,4 +1,4 @@
-import { LayoutDashboard, CheckSquare, Columns2 as Columns, Calculator, Scale, DollarSign, Package, ClipboardCheck, ChefHat, Upload, Settings } from 'lucide-react';
+import { LayoutDashboard, CheckSquare, Columns2 as Columns, Calculator, Scale, DollarSign, Package, ClipboardCheck, ChefHat, Upload, Settings, Sparkles } from 'lucide-react';
 
 type SidebarProps = {
   activeSection: string;
@@ -10,6 +10,7 @@ const menuItems = [
   { id: 'dashboard', icon: LayoutDashboard, label: 'Dashboard' },
   { id: 'todo', icon: CheckSquare, label: 'To-Do List' },
   { id: 'board', icon: Columns, label: 'Task Board' },
+  { id: 'cleaning', icon: Sparkles, label: 'Cleaning Board' },
   { id: 'conversions', icon: Calculator, label: 'Conversions' },
   { id: 'scaling', icon: Scale, label: 'Recipe Scaling' },
   { id: 'costing', icon: DollarSign, label: 'Costing Tool' },
