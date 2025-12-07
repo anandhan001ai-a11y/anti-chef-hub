@@ -1,32 +1,49 @@
 import { useState, useEffect } from 'react';
-import { useTasks } from '../contexts/TaskContext';
-import { supabase, CalendarEvent } from '../lib/supabase';
+import { Task, fetchTasks } from '../lib/taskService';
+import { supabase } from '../lib/supabase';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
+
+type CalendarEvent = {
+  id: string;
+  event_name: string;
+  event_date: string;
+  event_type: 'holiday' | 'cultural' | 'deadline' | 'special';
+  description: string;
+};
 
 type CalendarProps = {
   onDateClick: (date: Date) => void;
 };
 
 export default function Calendar({ onDateClick }: CalendarProps) {
-  const { tasks } = useTasks();
+  const [tasks, setTasks] = useState<Task[]>([]);
   const [currentDate, setCurrentDate] = useState(new Date());
   const [view, setView] = useState<'month' | 'year'>('year');
   const [calendarEvents, setCalendarEvents] = useState<CalendarEvent[]>([]);
 
   useEffect(() => {
-    const fetchEvents = async () => {
+    loadTasks();
+    loadEvents();
+  }, []);
+
+  const loadTasks = async () => {
+    // Load all tasks to show on calendar
+    const { data } = await fetchTasks('todo');
+    setTasks(data || []);
+  };
+
+  const loadEvents = async () => {
+    try {
       const { data } = await supabase.from('calendar_events').select('*');
       if (data) setCalendarEvents(data);
-    };
-    fetchEvents();
-  }, []);
+    } catch (e) {
+      // Calendar events table might not exist
+    }
+  };
 
   const getTasksForDate = (date: Date) => {
     const dateStr = date.toISOString().split('T')[0];
     return tasks.filter((task) => {
-      if (task.calendar_date) {
-        return task.calendar_date === dateStr;
-      }
       if (task.due_date) {
         return task.due_date.split('T')[0] === dateStr;
       }
@@ -36,92 +53,87 @@ export default function Calendar({ onDateClick }: CalendarProps) {
 
   const getEventsForDate = (date: Date) => {
     const dateStr = date.toISOString().split('T')[0];
-    return calendarEvents.filter((event) => event.event_date === dateStr);
+    return calendarEvents.filter((event) => event.event_date.split('T')[0] === dateStr);
   };
 
-  const renderMonthGrid = (year: number, month: number) => {
-    const firstDay = new Date(year, month, 1);
-    const lastDay = new Date(year, month + 1, 0);
-    const daysInMonth = lastDay.getDate();
-    const startingDayOfWeek = firstDay.getDay();
+  const getDaysInMonth = (year: number, month: number) => {
+    return new Date(year, month + 1, 0).getDate();
+  };
 
+  const getFirstDayOfMonth = (year: number, month: number) => {
+    return new Date(year, month, 1).getDay();
+  };
+
+  const renderMonthGrid = (year: number, month: number, compact = false) => {
+    const daysInMonth = getDaysInMonth(year, month);
+    const firstDay = getFirstDayOfMonth(year, month);
     const days = [];
-    for (let i = 0; i < startingDayOfWeek; i++) {
-      days.push(null);
+
+    for (let i = 0; i < firstDay; i++) {
+      days.push(<div key={`empty-${i}`} className="h-6" />);
     }
-    for (let i = 1; i <= daysInMonth; i++) {
-      days.push(i);
+
+    for (let day = 1; day <= daysInMonth; day++) {
+      const date = new Date(year, month, day);
+      const tasksForDay = getTasksForDate(date);
+      const eventsForDay = getEventsForDate(date);
+      const isToday = new Date().toDateString() === date.toDateString();
+      const hasItems = tasksForDay.length > 0 || eventsForDay.length > 0;
+
+      days.push(
+        <div
+          key={day}
+          onClick={() => onDateClick(date)}
+          className={`${compact ? 'h-6 text-xs' : 'h-8'} flex items-center justify-center rounded-lg cursor-pointer transition-all relative ${isToday
+              ? 'bg-[#ff7a00] text-white font-bold'
+              : hasItems
+                ? 'bg-[#ff7a00]/10 text-[#ff7a00] font-medium hover:bg-[#ff7a00]/20'
+                : 'hover:bg-gray-100'
+            }`}
+        >
+          {day}
+          {hasItems && !compact && (
+            <div className="absolute bottom-0.5 left-1/2 -translate-x-1/2 flex gap-0.5">
+              {tasksForDay.length > 0 && (
+                <div className="w-1 h-1 rounded-full bg-[#ff7a00]" />
+              )}
+              {eventsForDay.length > 0 && (
+                <div className="w-1 h-1 rounded-full bg-blue-500" />
+              )}
+            </div>
+          )}
+        </div>
+      );
     }
 
     return (
-      <div className="grid grid-cols-7 gap-1">
+      <div className={`grid grid-cols-7 gap-1 ${compact ? 'text-xs' : ''}`}>
         {['S', 'M', 'T', 'W', 'T', 'F', 'S'].map((day, i) => (
-          <div key={i} className="text-center text-xs font-medium text-gray-500 py-1">
+          <div key={i} className="text-center text-gray-400 text-xs font-medium">
             {day}
           </div>
         ))}
-        {days.map((day, index) => {
-          if (!day) {
-            return <div key={`empty-${index}`} className="aspect-square" />;
-          }
-
-          const date = new Date(year, month, day);
-          const tasksForDay = getTasksForDate(date);
-          const eventsForDay = getEventsForDate(date);
-          const isToday = new Date().toDateString() === date.toDateString();
-
-          const hasHighPriority = tasksForDay.some((t) => t.priority === 'high');
-          const hasCritical = tasksForDay.some(
-            (t) => t.task_type === 'audit' || eventsForDay.some((e) => e.event_type === 'deadline')
-          );
-
-          return (
-            <button
-              key={index}
-              onClick={() => onDateClick(date)}
-              className={`aspect-square rounded-lg text-xs font-medium transition-all hover:shadow-soft ${
-                isToday ? 'bg-neon-blue text-white' : 'bg-white hover:bg-gray-50'
-              } ${tasksForDay.length > 0 ? 'ring-2 ring-neon-blue/30' : ''}`}
-            >
-              <div className="flex flex-col items-center justify-center h-full">
-                <span>{day}</span>
-                {(tasksForDay.length > 0 || eventsForDay.length > 0) && (
-                  <div className="flex gap-0.5 mt-1">
-                    {hasCritical && <div className="w-1 h-1 rounded-full bg-red-500" />}
-                    {hasHighPriority && <div className="w-1 h-1 rounded-full bg-neon-orange" />}
-                    {tasksForDay.length > 0 && (
-                      <div className="w-1 h-1 rounded-full bg-neon-blue" />
-                    )}
-                    {eventsForDay.length > 0 && (
-                      <div className="w-1 h-1 rounded-full bg-neon-green" />
-                    )}
-                  </div>
-                )}
-              </div>
-            </button>
-          );
-        })}
+        {days}
       </div>
     );
   };
 
   const renderYearView = () => {
     const year = currentDate.getFullYear();
-    const months = [
-      'January', 'February', 'March', 'April', 'May', 'June',
-      'July', 'August', 'September', 'October', 'November', 'December'
-    ];
+    const months = [];
 
-    return (
-      <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-        {months.map((monthName, monthIndex) => (
-          <div key={monthIndex} className="bg-card-bg rounded-22 p-3">
-            <h4 className="text-xs font-semibold text-center mb-2">{monthName}</h4>
-            {renderMonthGrid(year, monthIndex)}
-          </div>
-        ))}
-      </div>
-    );
+    for (let month = 0; month < 12; month++) {
+      const monthName = new Date(year, month).toLocaleDateString('en-US', { month: 'short' });
+
+      months.push(
+        <div key={month} className="p-2">
+          <h4 className="text-xs font-semibold text-gray-600 mb-1 text-center">{monthName}</h4>
+          {renderMonthGrid(year, month, true)}
+        </div>
+      );
+    }
+
+    return <div className="grid grid-cols-3 md:grid-cols-4 gap-2">{months}</div>;
   };
 
   const renderMonthView = () => {
@@ -142,60 +154,46 @@ export default function Calendar({ onDateClick }: CalendarProps) {
       <div className="flex items-center justify-between mb-6">
         <div>
           <h2 className="text-xl font-bold">Calendar</h2>
-          <p className="text-sm text-gray-500 mt-1">
-            {tasks.filter(t => t.due_date || t.calendar_date).length} scheduled tasks
-          </p>
+          <p className="text-sm text-gray-500 mt-1">{currentDate.getFullYear()}</p>
         </div>
 
         <div className="flex items-center gap-2">
-          <button
-            onClick={() => setView(view === 'year' ? 'month' : 'year')}
-            className="px-4 py-2 rounded-full text-sm font-medium bg-gray-100 hover:bg-gray-200 transition-colors"
-          >
-            {view === 'year' ? 'Month' : 'Year'} View
-          </button>
-
-          {view === 'month' && (
-            <>
-              <button
-                onClick={() => setCurrentDate(new Date(currentDate.setMonth(currentDate.getMonth() - 1)))}
-                className="p-2 rounded-full hover:bg-gray-100"
-              >
-                <ChevronLeft className="w-5 h-5" />
-              </button>
-              <button
-                onClick={() => setCurrentDate(new Date(currentDate.setMonth(currentDate.getMonth() + 1)))}
-                className="p-2 rounded-full hover:bg-gray-100"
-              >
-                <ChevronRight className="w-5 h-5" />
-              </button>
-            </>
-          )}
+          <div className="flex bg-gray-100 rounded-full p-1">
+            <button
+              onClick={() => setView('month')}
+              className={`px-3 py-1 text-xs rounded-full transition-all ${view === 'month' ? 'bg-white shadow-sm' : ''
+                }`}
+            >
+              Month
+            </button>
+            <button
+              onClick={() => setView('year')}
+              className={`px-3 py-1 text-xs rounded-full transition-all ${view === 'year' ? 'bg-white shadow-sm' : ''
+                }`}
+            >
+              Year
+            </button>
+          </div>
         </div>
       </div>
 
-      <div className="overflow-y-auto max-h-[calc(100vh-250px)] scrollbar-hide">
-        {view === 'year' ? renderYearView() : renderMonthView()}
+      <div className="flex items-center justify-center gap-4 mb-4">
+        <button
+          onClick={() => setCurrentDate(new Date(currentDate.getFullYear() - 1, currentDate.getMonth()))}
+          className="p-1 hover:bg-gray-100 rounded-lg"
+        >
+          <ChevronLeft className="w-5 h-5" />
+        </button>
+        <span className="font-semibold">{currentDate.getFullYear()}</span>
+        <button
+          onClick={() => setCurrentDate(new Date(currentDate.getFullYear() + 1, currentDate.getMonth()))}
+          className="p-1 hover:bg-gray-100 rounded-lg"
+        >
+          <ChevronRight className="w-5 h-5" />
+        </button>
       </div>
 
-      <div className="mt-6 grid grid-cols-2 gap-2 text-xs">
-        <div className="flex items-center gap-2">
-          <div className="w-3 h-3 rounded-full bg-red-500" />
-          <span className="text-gray-600">Critical/HACCP</span>
-        </div>
-        <div className="flex items-center gap-2">
-          <div className="w-3 h-3 rounded-full bg-neon-orange" />
-          <span className="text-gray-600">High Priority</span>
-        </div>
-        <div className="flex items-center gap-2">
-          <div className="w-3 h-3 rounded-full bg-neon-blue" />
-          <span className="text-gray-600">Tasks</span>
-        </div>
-        <div className="flex items-center gap-2">
-          <div className="w-3 h-3 rounded-full bg-neon-green" />
-          <span className="text-gray-600">Events</span>
-        </div>
-      </div>
+      {view === 'year' ? renderYearView() : renderMonthView()}
     </div>
   );
 }

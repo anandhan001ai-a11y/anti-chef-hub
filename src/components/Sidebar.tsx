@@ -1,4 +1,5 @@
-import { LayoutDashboard, CheckSquare, Columns2 as Columns, Calculator, Scale, DollarSign, Package, ClipboardCheck, ChefHat, Upload, Settings, Sparkles } from 'lucide-react';
+import { CheckSquare, Calculator, Scale, DollarSign, Package, ClipboardCheck, ChefHat, Key, Settings, Sparkles, PieChart, PenTool, LogOut } from 'lucide-react';
+import { supabase } from '../lib/supabase';
 
 type SidebarProps = {
   activeSection: string;
@@ -7,17 +8,17 @@ type SidebarProps = {
 };
 
 const menuItems = [
-  { id: 'dashboard', icon: LayoutDashboard, label: 'Dashboard' },
-  { id: 'todo', icon: CheckSquare, label: 'To-Do List' },
-  { id: 'board', icon: Columns, label: 'Task Board' },
-  { id: 'cleaning', icon: Sparkles, label: 'Cleaning Board' },
+  { id: 'analytics', icon: PieChart, label: 'Analytics' },
+  { id: 'tasks', icon: CheckSquare, label: 'Tasks' },
+  { id: 'cleaning', icon: Sparkles, label: 'Chef Check List' },
   { id: 'conversions', icon: Calculator, label: 'Conversions' },
   { id: 'scaling', icon: Scale, label: 'Recipe Scaling' },
   { id: 'costing', icon: DollarSign, label: 'Costing Tool' },
   { id: 'inventory', icon: Package, label: 'Inventory' },
   { id: 'haccp', icon: ClipboardCheck, label: 'HACCP Logs' },
   { id: 'menu', icon: ChefHat, label: 'Menu Engineering' },
-  { id: 'upload', icon: Upload, label: 'Upload (PicaOS)' },
+  { id: 'whiteboard', icon: PenTool, label: 'Whiteboard' },
+  { id: 'upload', icon: Key, label: 'Google Credentials' },
   { id: 'settings', icon: Settings, label: 'Settings' },
 ];
 
@@ -49,11 +50,10 @@ export default function Sidebar({ activeSection, setActiveSection, chefName }: S
             <button
               key={item.id}
               onClick={() => setActiveSection(item.id)}
-              className={`w-full flex items-center gap-3 px-4 py-3 rounded-22 transition-all duration-200 group ${
-                isActive
-                  ? 'bg-neon-blue text-white shadow-neon-blue'
-                  : 'hover:bg-white hover:shadow-soft text-gray-600'
-              }`}
+              className={`w-full flex items-center gap-3 px-4 py-3 rounded-22 transition-all duration-200 group ${isActive
+                ? 'bg-neon-blue text-white shadow-neon-blue'
+                : 'hover:bg-white hover:shadow-soft text-gray-600'
+                }`}
             >
               <Icon className={`w-5 h-5 ${isActive ? 'text-white' : 'text-gray-500 group-hover:text-neon-blue'}`} />
               <span className="hidden lg:block font-medium text-sm">{item.label}</span>
@@ -64,6 +64,41 @@ export default function Sidebar({ activeSection, setActiveSection, chefName }: S
           );
         })}
       </nav>
+
+      {/* Logout Section */}
+      <div className="absolute bottom-6 left-4 right-4">
+        <button
+          onClick={async () => {
+            // Clear all stored credentials and settings
+            localStorage.removeItem('chef_profile');
+            localStorage.removeItem('app_theme');
+            localStorage.removeItem('GOOGLE_API_KEY');
+            localStorage.removeItem('GOOGLE_CLIENT_ID');
+            localStorage.removeItem('GOOGLE_GEMINI_KEY');
+            localStorage.removeItem('whiteboard_items');
+
+            // Sign out from Supabase
+            await supabase.auth.signOut();
+
+            // Reload the page to reset state
+            window.location.reload();
+          }}
+          className="w-full flex items-center justify-center lg:justify-start gap-3 px-4 py-3 rounded-xl bg-red-50 hover:bg-red-100 text-red-600 font-bold transition-all duration-200 group"
+        >
+          <LogOut className="w-5 h-5" />
+          <span className="hidden lg:block text-sm">Logout</span>
+        </button>
+
+        {/* Status Indicator */}
+        <div className="mt-3 hidden lg:block">
+          <div className="bg-gradient-to-r from-neon-blue/10 to-neon-violet/10 rounded-xl p-3 border border-neon-blue/20">
+            <div className="flex items-center gap-2">
+              <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
+              <span className="text-xs font-bold text-gray-700">System Online</span>
+            </div>
+          </div>
+        </div>
+      </div>
     </aside>
   );
 }

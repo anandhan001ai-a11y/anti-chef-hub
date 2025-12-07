@@ -1,37 +1,33 @@
-import { useState, useEffect } from 'react';
-import { TaskProvider } from './contexts/TaskContext';
-import { CleaningTaskProvider } from './contexts/CleaningTaskContext';
+import { AuthProvider, useAuth } from './contexts/AuthContext';
 import Dashboard from './components/Dashboard';
 import Login from './components/Login';
 
-function App() {
-  const [chefName, setChefName] = useState<string>('');
-  const [isLoggedIn, setIsLoggedIn] = useState(false);
+function AppContent() {
+  const { user, loading, userName } = useAuth();
 
-  useEffect(() => {
-    const savedChefName = localStorage.getItem('chefName');
-    if (savedChefName) {
-      setChefName(savedChefName);
-      setIsLoggedIn(true);
-    }
-  }, []);
-
-  const handleLogin = (name: string) => {
-    setChefName(name);
-    setIsLoggedIn(true);
-    localStorage.setItem('chefName', name);
-  };
-
-  if (!isLoggedIn) {
-    return <Login onLogin={handleLogin} />;
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-gray-50 via-white to-orange-50 flex items-center justify-center">
+        <div className="text-center">
+          <div className="w-16 h-16 border-4 border-[#ff7a00] border-t-transparent rounded-full animate-spin mx-auto mb-4" />
+          <p className="text-gray-600 font-medium">Loading...</p>
+        </div>
+      </div>
+    );
   }
 
+  if (!user) {
+    return <Login />;
+  }
+
+  return <Dashboard chefName={userName || 'Chef'} />;
+}
+
+function App() {
   return (
-    <TaskProvider>
-      <CleaningTaskProvider>
-        <Dashboard chefName={chefName} />
-      </CleaningTaskProvider>
-    </TaskProvider>
+    <AuthProvider>
+      <AppContent />
+    </AuthProvider>
   );
 }
 

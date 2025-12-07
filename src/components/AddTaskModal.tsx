@@ -1,6 +1,6 @@
 import { useState } from 'react';
-import { useTasks } from '../contexts/TaskContext';
-import { X } from 'lucide-react';
+import { X, Calendar, Plus } from 'lucide-react';
+import { createTask, BoardType } from '../lib/taskService';
 
 type AddTaskModalProps = {
   isOpen: boolean;
@@ -9,194 +9,181 @@ type AddTaskModalProps = {
 };
 
 export default function AddTaskModal({ isOpen, onClose, preselectedDate }: AddTaskModalProps) {
-  const { addTask } = useTasks();
-  const [formData, setFormData] = useState({
-    title: '',
-    description: '',
-    due_date: preselectedDate ? preselectedDate.toISOString().split('T')[0] : '',
-    priority: 'medium' as 'high' | 'medium' | 'low',
-    status: 'todo' as 'todo' | 'in-progress' | 'completed',
-    category: '',
-    kitchen_section: 'general' as 'hot' | 'cold' | 'pastry' | 'butchery' | 'general',
-    task_type: 'other' as 'costing' | 'menu' | 'audit' | 'inventory' | 'prep' | 'other',
-    position: 0,
-    calendar_date: preselectedDate ? preselectedDate.toISOString().split('T')[0] : null,
-  });
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    try {
-      await addTask(formData);
-      onClose();
-      setFormData({
-        title: '',
-        description: '',
-        due_date: '',
-        priority: 'medium',
-        status: 'todo',
-        category: '',
-        kitchen_section: 'general',
-        task_type: 'other',
-        position: 0,
-        calendar_date: null,
-      });
-    } catch (error) {
-      console.error('Error adding task:', error);
-    }
-  };
+  const [title, setTitle] = useState('');
+  const [description, setDescription] = useState('');
+  const [dueDate, setDueDate] = useState(
+    preselectedDate ? preselectedDate.toISOString().split('T')[0] : ''
+  );
+  const [boardType, setBoardType] = useState<BoardType>('todo');
+  const [sectionKey, setSectionKey] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
 
   if (!isOpen) return null;
 
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!title.trim()) {
+      setError('Title is required');
+      return;
+    }
+
+    setLoading(true);
+    setError('');
+
+    const { error } = await createTask({
+      title: title.trim(),
+      description: description.trim() || undefined,
+      board_type: boardType,
+      section_key: sectionKey || undefined,
+      due_date: dueDate ? new Date(dueDate).toISOString() : undefined,
+    });
+
+    if (error) {
+      setError(error.message);
+      setLoading(false);
+      return;
+    }
+
+    // Reset and close
+    setTitle('');
+    setDescription('');
+    setDueDate('');
+    setBoardType('todo');
+    setSectionKey('');
+    setLoading(false);
+    onClose();
+  };
+
   return (
-    <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-      <div className="bg-white rounded-24 shadow-soft max-w-2xl w-full max-h-[90vh] overflow-y-auto">
-        <div className="sticky top-0 bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between rounded-t-24">
-          <h2 className="text-xl font-bold">Add New Task</h2>
+    <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+      <div className="bg-white rounded-3xl shadow-2xl max-w-lg w-full max-h-[90vh] overflow-y-auto">
+        {/* Header */}
+        <div className="flex items-center justify-between p-6 border-b border-gray-100">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 bg-gradient-to-r from-[#ff7a00] to-[#ff8f2d] rounded-xl flex items-center justify-center">
+              <Plus className="w-5 h-5 text-white" />
+            </div>
+            <h2 className="text-xl font-bold">Add New Task</h2>
+          </div>
           <button
             onClick={onClose}
-            className="p-2 hover:bg-gray-100 rounded-full transition-colors"
+            className="p-2 hover:bg-gray-100 rounded-xl transition-colors"
           >
             <X className="w-5 h-5" />
           </button>
         </div>
 
-        <form onSubmit={handleSubmit} className="p-6 space-y-4">
+        {/* Form */}
+        <form onSubmit={handleSubmit} className="p-6 space-y-5">
+          {/* Title */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
               Task Title *
             </label>
             <input
               type="text"
-              required
-              value={formData.title}
-              onChange={(e) => setFormData({ ...formData, title: e.target.value })}
-              className="w-full px-4 py-3 rounded-22 border border-gray-200 focus:outline-none focus:border-neon-blue focus:ring-2 focus:ring-neon-blue/20"
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
               placeholder="Enter task title..."
+              className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:border-[#ff7a00] focus:ring-2 focus:ring-[#ff7a00]/20"
+              autoFocus
             />
           </div>
 
+          {/* Description */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
               Description
             </label>
             <textarea
-              value={formData.description}
-              onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+              placeholder="Add more details..."
               rows={3}
-              className="w-full px-4 py-3 rounded-22 border border-gray-200 focus:outline-none focus:border-neon-blue focus:ring-2 focus:ring-neon-blue/20 resize-none"
-              placeholder="Add task description..."
+              className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:border-[#ff7a00] focus:ring-2 focus:ring-[#ff7a00]/20 resize-none"
             />
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Priority
-              </label>
-              <select
-                value={formData.priority}
-                onChange={(e) => setFormData({ ...formData, priority: e.target.value as any })}
-                className="w-full px-4 py-3 rounded-22 border border-gray-200 focus:outline-none focus:border-neon-blue focus:ring-2 focus:ring-neon-blue/20"
-              >
-                <option value="low">Low Priority</option>
-                <option value="medium">Medium Priority</option>
-                <option value="high">High Priority</option>
-              </select>
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Status
-              </label>
-              <select
-                value={formData.status}
-                onChange={(e) => setFormData({ ...formData, status: e.target.value as any })}
-                className="w-full px-4 py-3 rounded-22 border border-gray-200 focus:outline-none focus:border-neon-blue focus:ring-2 focus:ring-neon-blue/20"
-              >
-                <option value="todo">To Do</option>
-                <option value="in-progress">In Progress</option>
-                <option value="completed">Completed</option>
-              </select>
-            </div>
+          {/* Board Type */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Add to
+            </label>
+            <select
+              value={boardType}
+              onChange={(e) => {
+                setBoardType(e.target.value as BoardType);
+                setSectionKey('');
+              }}
+              className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:border-[#ff7a00]"
+            >
+              <option value="todo">To-Do List</option>
+              <option value="taskboard">Task Board</option>
+              <option value="cleaning">Cleaning Board</option>
+            </select>
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
+          {/* Section (for cleaning board) */}
+          {boardType === 'cleaning' && (
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
-                Kitchen Section
+                Section
               </label>
               <select
-                value={formData.kitchen_section}
-                onChange={(e) => setFormData({ ...formData, kitchen_section: e.target.value as any })}
-                className="w-full px-4 py-3 rounded-22 border border-gray-200 focus:outline-none focus:border-neon-blue focus:ring-2 focus:ring-neon-blue/20"
+                value={sectionKey}
+                onChange={(e) => setSectionKey(e.target.value)}
+                className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:border-[#ff7a00]"
               >
-                <option value="general">General</option>
-                <option value="hot">Hot Kitchen</option>
-                <option value="cold">Cold Kitchen</option>
-                <option value="pastry">Pastry</option>
-                <option value="butchery">Butchery</option>
+                <option value="shift">Shift Tasks</option>
+                <option value="endOfDay">End of Day Tasks</option>
+                <option value="weekly">Weekly Tasks</option>
+                <option value="monthly">Monthly Tasks</option>
               </select>
             </div>
+          )}
 
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Task Type
-              </label>
-              <select
-                value={formData.task_type}
-                onChange={(e) => setFormData({ ...formData, task_type: e.target.value as any })}
-                className="w-full px-4 py-3 rounded-22 border border-gray-200 focus:outline-none focus:border-neon-blue focus:ring-2 focus:ring-neon-blue/20"
-              >
-                <option value="other">Other</option>
-                <option value="costing">Costing</option>
-                <option value="menu">Menu Planning</option>
-                <option value="audit">Audit</option>
-                <option value="inventory">Inventory</option>
-                <option value="prep">Prep</option>
-              </select>
-            </div>
-          </div>
-
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Due Date
-              </label>
+          {/* Due Date */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Due Date
+            </label>
+            <div className="relative">
+              <Calendar className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
               <input
                 type="date"
-                value={formData.due_date}
-                onChange={(e) => setFormData({ ...formData, due_date: e.target.value })}
-                className="w-full px-4 py-3 rounded-22 border border-gray-200 focus:outline-none focus:border-neon-blue focus:ring-2 focus:ring-neon-blue/20"
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Category
-              </label>
-              <input
-                type="text"
-                value={formData.category}
-                onChange={(e) => setFormData({ ...formData, category: e.target.value })}
-                className="w-full px-4 py-3 rounded-22 border border-gray-200 focus:outline-none focus:border-neon-blue focus:ring-2 focus:ring-neon-blue/20"
-                placeholder="e.g., Weekly Prep"
+                value={dueDate}
+                onChange={(e) => setDueDate(e.target.value)}
+                className="w-full pl-12 pr-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:border-[#ff7a00]"
               />
             </div>
           </div>
 
-          <div className="flex gap-3 pt-4">
+          {/* Error */}
+          {error && (
+            <div className="p-3 bg-red-50 border border-red-200 rounded-xl text-red-600 text-sm">
+              {error}
+            </div>
+          )}
+
+          {/* Actions */}
+          <div className="flex gap-3 pt-2">
             <button
               type="button"
               onClick={onClose}
-              className="flex-1 px-6 py-3 rounded-full border border-gray-300 text-gray-700 font-medium hover:bg-gray-50 transition-colors"
+              className="flex-1 px-4 py-3 bg-gray-100 text-gray-700 rounded-xl hover:bg-gray-200 transition-colors font-medium"
             >
               Cancel
             </button>
             <button
               type="submit"
-              className="flex-1 px-6 py-3 rounded-full bg-gradient-to-r from-neon-blue to-neon-violet text-white font-medium hover:shadow-neon-blue transition-all"
+              disabled={loading}
+              className={`flex-1 px-4 py-3 rounded-xl font-medium transition-all ${loading
+                  ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                  : 'bg-gradient-to-r from-[#ff7a00] to-[#ff8f2d] text-white hover:shadow-lg'
+                }`}
             >
-              Add Task
+              {loading ? 'Adding...' : 'Add Task'}
             </button>
           </div>
         </form>
