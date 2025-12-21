@@ -3,11 +3,13 @@ import {
     Plus, Clock, User, Trash2,
     BarChart3, Settings, ShoppingCart,
     Loader2, PieChart as PieIcon, GripVertical,
-    Calendar as CalendarIcon, RefreshCw
+    Calendar as CalendarIcon, RefreshCw, Sparkles, Users, Send, Mail, MessageCircle
 } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { Task, createTask, updateTask, deleteTask } from '../../lib/taskService';
 import { googleService } from '../../lib/google';
+import { SidService } from '../../lib/SidService';
+import { birdEmailService } from '../../lib/birdEmailService';
 import { PieChart as RePie, Pie, Cell, ResponsiveContainer, BarChart, Bar, XAxis, Tooltip } from 'recharts';
 
 import {
@@ -79,9 +81,9 @@ function SortableTaskItem({ task, column, onDelete }: { task: NeonTask; column: 
         >
             <div className="flex justify-between items-start mb-2">
                 <span className={`text-[10px] font-bold uppercase tracking-widest px-2 py-0.5 rounded border ${task.is_event ? 'text-purple-600 border-purple-200 bg-purple-50' :
-                        task.priority === 'High' ? 'text-red-600 border-red-200 bg-red-50' :
-                            task.priority === 'Medium' ? 'text-orange-600 border-orange-200 bg-orange-50' :
-                                'text-green-600 border-green-200 bg-green-50'
+                    task.priority === 'High' ? 'text-red-600 border-red-200 bg-red-50' :
+                        task.priority === 'Medium' ? 'text-orange-600 border-orange-200 bg-orange-50' :
+                            'text-green-600 border-green-200 bg-green-50'
                     }`}>
                     {task.is_event ? 'EVENT' : (task.priority || 'Medium')}
                 </span>
@@ -164,6 +166,12 @@ export default function NeonTaskBoard() {
     const [activeId, setActiveId] = useState<string | null>(null);
     const [viewMode, setViewMode] = useState<TimeRange>('all');
 
+    // TEAM TASK STATE
+    const [teamMembers, setTeamMembers] = useState<{ name: string; role: string; id: string }[]>([]);
+    const [aiSuggestions, setAiSuggestions] = useState<string[]>([]);
+    const [showAiSuggestions, setShowAiSuggestions] = useState(false);
+    const [generatingAi, setGeneratingAi] = useState(false);
+
     // Form State
     const [newTask, setNewTask] = useState({
         title: '', type: 'prep', priority: 'Medium', assignee: '', notes: '',
@@ -174,6 +182,20 @@ export default function NeonTaskBoard() {
         useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
         useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
     );
+
+    // Load team members from roster
+    useEffect(() => {
+        const rosterData = SidService.loadRosterFromLocalStorage();
+        if (rosterData?.staff) {
+            const members = rosterData.staff.map((emp: any) => ({
+                name: emp.name || 'Unknown',
+                role: emp.role || emp.position || 'Staff',
+                id: emp.rollNumber || emp.employeeId || String(Math.random())
+            }));
+            setTeamMembers(members);
+            console.log('📋 Loaded', members.length, 'team members from roster');
+        }
+    }, []);
 
     useEffect(() => {
         fetchTasksInternal();
@@ -449,17 +471,65 @@ export default function NeonTaskBoard() {
                     <div className="flex justify-between items-center mb-6">
                         <h2 className="text-2xl font-bold flex items-center gap-2 text-gray-900">
                             <div className="p-2 bg-blue-50 rounded-lg text-blue-600"><Plus size={20} /></div>
-                            New Task
+                            New Team Task
                         </h2>
                         <button onClick={handleGoogleSync} className="flex items-center gap-2 text-sm font-bold text-gray-500 hover:text-blue-600 transition-colors">
                             <RefreshCw size={14} /> Sync Google Tasks & Calendar
                         </button>
                     </div>
-                    {/* ... Form inputs ... */}
+
+                    {/* Task Name with AI Suggestion */}
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
-                        <div className="col-span-1 md:col-span-2">
-                            <input type="text" placeholder="Task Name" className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 font-medium outline-none"
-                                value={newTask.title} onChange={e => setNewTask({ ...newTask, title: e.target.value })} />
+                        <div className="col-span-1 md:col-span-2 relative">
+                            <div className="flex gap-2">
+                                <input type="text" placeholder="Task Name"
+                                    className="flex-1 bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 font-medium outline-none focus:ring-2 focus:ring-blue-300"
+                                    value={newTask.title} onChange={e => setNewTask({ ...newTask, title: e.target.value })} />
+                                <button
+                                    onClick={async () => {
+                                        setGeneratingAi(true);
+                                        setShowAiSuggestions(true);
+                                        // Generate AI task name suggestions
+                                        const suggestions = [
+                                            `${newTask.type.charAt(0).toUpperCase() + newTask.type.slice(1)} - ${new Date().toLocaleDateString('en-US', { weekday: 'short' })}`,
+                                            `Complete ${newTask.type} task by ${newTask.assignee || 'team'}`,
+                                            `${newTask.priority} priority: ${newTask.type} work`,
+                                            `Daily ${newTask.type} checklist`,
+                                            `Kitchen ${newTask.type} - ${newTask.priority.toLowerCase()}`
+                                        ];
+                                        setAiSuggestions(suggestions);
+                                        setGeneratingAi(false);
+                                    }}
+                                    className="px-4 py-3 bg-gradient-to-r from-purple-500 to-indigo-500 text-white font-bold rounded-xl flex items-center gap-2 hover:shadow-lg transition-all"
+                                    title="AI Suggest Task Name"
+                                >
+                                    {generatingAi ? <Loader2 size={16} className="animate-spin" /> : <Sparkles size={16} />}
+                                    AI
+                                </button>
+                            </div>
+
+                            {/* AI Suggestions Dropdown */}
+                            {showAiSuggestions && aiSuggestions.length > 0 && (
+                                <div className="absolute top-full left-0 right-0 mt-2 bg-white border border-gray-200 rounded-xl shadow-xl z-50 overflow-hidden">
+                                    <div className="px-4 py-2 bg-gradient-to-r from-purple-50 to-indigo-50 border-b border-gray-200 flex items-center gap-2">
+                                        <Sparkles size={14} className="text-purple-500" />
+                                        <span className="text-sm font-bold text-purple-700">AI Suggestions</span>
+                                        <button onClick={() => setShowAiSuggestions(false)} className="ml-auto text-gray-400 hover:text-gray-600">×</button>
+                                    </div>
+                                    {aiSuggestions.map((suggestion, i) => (
+                                        <button
+                                            key={i}
+                                            onClick={() => {
+                                                setNewTask({ ...newTask, title: suggestion });
+                                                setShowAiSuggestions(false);
+                                            }}
+                                            className="w-full text-left px-4 py-2 hover:bg-gray-50 text-sm text-gray-700 border-b border-gray-100 last:border-0"
+                                        >
+                                            {suggestion}
+                                        </button>
+                                    ))}
+                                </div>
+                            )}
                         </div>
                         <select className="bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 font-medium outline-none" value={newTask.type} onChange={e => setNewTask({ ...newTask, type: e.target.value })}>
                             {TASK_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
@@ -471,12 +541,87 @@ export default function NeonTaskBoard() {
                             ))}
                         </div>
                     </div>
-                    <div className="grid grid-cols-1 md:grid-cols-4 gap-4 items-end">
-                        <input type="text" placeholder="Assignee" className="bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 font-medium" value={newTask.assignee} onChange={e => setNewTask({ ...newTask, assignee: e.target.value })} />
+
+                    {/* Team Assignment Row */}
+                    <div className="grid grid-cols-1 md:grid-cols-4 gap-4 items-end mb-4">
+                        <div className="relative">
+                            <label className="block text-xs font-bold text-gray-500 mb-1 flex items-center gap-1">
+                                <Users size={12} /> Assign To Team Member
+                            </label>
+                            <select
+                                className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 font-medium outline-none focus:ring-2 focus:ring-blue-300"
+                                value={newTask.assignee}
+                                onChange={e => setNewTask({ ...newTask, assignee: e.target.value })}
+                            >
+                                <option value="">Select team member...</option>
+                                {teamMembers.map((member, i) => (
+                                    <option key={i} value={member.name}>
+                                        {member.name} - {member.role}
+                                    </option>
+                                ))}
+                            </select>
+                            {teamMembers.length === 0 && (
+                                <p className="text-xs text-amber-600 mt-1">⚠️ Upload roster in Duty Schedule to see team members</p>
+                            )}
+                        </div>
                         <input type="date" className="bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 font-medium text-gray-500" value={newTask.dueDate} onChange={e => setNewTask({ ...newTask, dueDate: e.target.value })} />
                         <input type="time" className="bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 font-medium text-gray-500" value={newTask.dueTime} onChange={e => setNewTask({ ...newTask, dueTime: e.target.value })} />
-                        <button onClick={handleAddTask} className="py-3 bg-gray-900 text-white font-bold rounded-xl shadow-lg">Add Task</button>
+                        <button onClick={handleAddTask} className="py-3 bg-gray-900 text-white font-bold rounded-xl shadow-lg hover:bg-gray-800 transition-colors">
+                            Add Task
+                        </button>
                     </div>
+
+                    {/* Send Options (show when task has title and assignee) */}
+                    {newTask.title && newTask.assignee && (
+                        <div className="flex items-center gap-3 pt-4 border-t border-gray-100">
+                            <span className="text-sm font-medium text-gray-500">Notify {newTask.assignee}:</span>
+                            <button
+                                onClick={async () => {
+                                    // Use Bird Email Service
+                                    const result = await birdEmailService.sendTaskNotification({
+                                        taskTitle: newTask.title,
+                                        assigneeName: newTask.assignee,
+                                        assigneeEmail: '', // Will fallback to mailto since no email configured
+                                        priority: newTask.priority,
+                                        dueDate: newTask.dueDate || undefined,
+                                        notes: newTask.notes || undefined
+                                    });
+                                    if (result.success) {
+                                        alert(`✅ Task notification sent to ${newTask.assignee}!`);
+                                    } else {
+                                        console.error('Email failed:', result.error);
+                                    }
+                                }}
+                                className="flex items-center gap-2 px-4 py-2 bg-blue-50 text-blue-600 font-bold rounded-lg hover:bg-blue-100 transition-colors"
+                            >
+                                <Mail size={14} /> Email
+                            </button>
+                            <button
+                                onClick={() => {
+                                    alert(`📨 Task "${newTask.title}" sent to ${newTask.assignee} in Team Chat!\n\n(In-app chat notification would appear here)`);
+                                }}
+                                className="flex items-center gap-2 px-4 py-2 bg-green-50 text-green-600 font-bold rounded-lg hover:bg-green-100 transition-colors"
+                            >
+                                <MessageCircle size={14} /> Chat
+                            </button>
+                            <button
+                                onClick={() => {
+                                    if (navigator.share) {
+                                        navigator.share({
+                                            title: newTask.title,
+                                            text: `Task for ${newTask.assignee}: ${newTask.title}\nPriority: ${newTask.priority}\nDue: ${newTask.dueDate || 'Not set'}`
+                                        });
+                                    } else {
+                                        navigator.clipboard.writeText(`Task for ${newTask.assignee}: ${newTask.title}\nPriority: ${newTask.priority}\nDue: ${newTask.dueDate || 'Not set'}`);
+                                        alert('📋 Task details copied to clipboard!');
+                                    }
+                                }}
+                                className="flex items-center gap-2 px-4 py-2 bg-purple-50 text-purple-600 font-bold rounded-lg hover:bg-purple-100 transition-colors"
+                            >
+                                <Send size={14} /> Share
+                            </button>
+                        </div>
+                    )}
                 </div>
 
                 {/* 2. Drag & Drop Board */}

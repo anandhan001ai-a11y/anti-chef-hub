@@ -1,10 +1,11 @@
 import { useState, useEffect } from 'react';
-import { User, Palette, Moon, Sun, Monitor, Camera, Save, Check, Users, Mail, Copy, UserPlus, CheckCircle } from 'lucide-react';
+import { User, Palette, Moon, Sun, Monitor, Camera, Save, Check, Users, Mail, Copy, UserPlus, CheckCircle, Key } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
+import GoogleCredentialsPage from '../credentials/GoogleCredentialsPage';
 
 export default function SettingsPage() {
     // --- State ---
-    const [activeTab, setActiveTab] = useState<'profile' | 'appearance' | 'team'>('profile');
+    const [activeTab, setActiveTab] = useState<'profile' | 'appearance' | 'team' | 'credentials'>('profile');
     const [profile, setProfile] = useState({
         name: 'Chef Ram',
         role: 'Executive Chef',
@@ -387,6 +388,12 @@ Restaurant: ${profile.restaurant}`;
                     >
                         <Palette size={18} /> Appearance
                     </button>
+                    <button
+                        onClick={() => setActiveTab('credentials')}
+                        className={`flex items-center gap-3 px-4 py-3 rounded-xl font-bold text-sm transition-all ${activeTab === 'credentials' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-900 hover:bg-gray-100'}`}
+                    >
+                        <Key size={18} /> Google Credentials
+                    </button>
                 </div>
 
                 {/* Content Area */}
@@ -394,6 +401,11 @@ Restaurant: ${profile.restaurant}`;
                     {activeTab === 'profile' && renderProfile()}
                     {activeTab === 'team' && renderTeam()}
                     {activeTab === 'appearance' && renderAppearance()}
+                    {activeTab === 'credentials' && (
+                        <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
+                            <GoogleCredentialsPage />
+                        </div>
+                    )}
                 </div>
             </div>
         </div>

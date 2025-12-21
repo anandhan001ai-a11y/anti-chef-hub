@@ -1,6 +1,6 @@
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import Dashboard from './components/Dashboard';
-import Login from './components/Login';
+import LandingPage from './components/LandingPage';
 
 function AppContent() {
   const { user, loading, userName } = useAuth();
@@ -17,7 +17,7 @@ function AppContent() {
   }
 
   if (!user) {
-    return <Login />;
+    return <LandingPage />;
   }
 
   return <Dashboard chefName={userName || 'Chef'} />;

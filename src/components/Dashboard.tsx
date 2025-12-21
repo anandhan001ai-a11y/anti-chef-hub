@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { MessageSquare } from 'lucide-react';
 import { Task } from '../lib/taskService';
 import Sidebar from './Sidebar';
 import TopNav from './TopNav';
@@ -14,21 +15,21 @@ import ConversionsPage from './conversions/ConversionsPage';
 import RecipeScaler from './scaling/RecipeScaler';
 import CostingDashboard from './costing/CostingDashboard';
 import InventoryPage from './inventory/InventoryPage';
-import GoogleCredentialsPage from './credentials/GoogleCredentialsPage';
 import MenuEngineering from './menu/MenuEngineering';
 import HaccpReference from './haccp/HaccpReference';
-import TaskAnalyticsDashboard from './analytics/TaskAnalyticsDashboard';
 import NeonTaskBoard from './tasks/NeonTaskBoard';
 import Whiteboard from './whiteboard/Whiteboard';
 import SettingsPage from './settings/SettingsPage';
 import CollaborationPanel from './CollaborationPanel';
+import AnalyticsDashboard from './AnalyticsDashboard';
+import KitchenChatHub from './chat/KitchenChatHub';
 
 type DashboardProps = {
   chefName: string;
 };
 
 export default function Dashboard({ chefName }: DashboardProps) {
-  const [activeSection, setActiveSection] = useState('analytics');
+  const [activeSection, setActiveSection] = useState('analytics-dashboard');
   const [activeFilter, setActiveFilter] = useState('Full Year');
   const [searchQuery, setSearchQuery] = useState('');
   const [isAddTaskModalOpen, setIsAddTaskModalOpen] = useState(false);
@@ -84,8 +85,8 @@ export default function Dashboard({ chefName }: DashboardProps) {
           </div>
         );
 
-      case 'analytics':
-        return <TaskAnalyticsDashboard />;
+      case 'analytics-dashboard':
+        return <AnalyticsDashboard />;
 
       case 'tasks':
         return <NeonTaskBoard />;
@@ -108,9 +109,6 @@ export default function Dashboard({ chefName }: DashboardProps) {
       case 'inventory':
         return <InventoryPage />;
 
-      case 'upload':
-        return <GoogleCredentialsPage />;
-
       case 'haccp':
         return <HaccpReference />;
 
@@ -119,6 +117,9 @@ export default function Dashboard({ chefName }: DashboardProps) {
 
       case 'settings':
         return <SettingsPage />;
+
+      case 'chat-hub':
+        return <KitchenChatHub />;
 
       default:
         return (
@@ -135,7 +136,7 @@ export default function Dashboard({ chefName }: DashboardProps) {
   };
 
   return (
-    <div className={`min-h-screen transition-colors duration-300 ${theme === 'dark' ? 'dark bg-gray-900 text-white' : 'bg-gray-50 text-gray-900'}`}>
+    <div className={`min-h-screen transition-colors duration-300 ${theme === 'dark' ? 'dark bg-slate-900 text-white' : 'bg-slate-50 text-slate-900'}`}>
       <Sidebar
         activeSection={activeSection}
         setActiveSection={setActiveSection}
@@ -156,11 +157,11 @@ export default function Dashboard({ chefName }: DashboardProps) {
           {activeSection !== 'cleaning' && (
             <div className="mb-6">
               <div className="flex items-center gap-4 mb-2">
-                <h1 className={`text-3xl font-bold ${theme === 'dark' ? 'text-white' : 'text-gray-900'}`}>
-                  {getTimeBasedGreeting()}, <span className="bg-gradient-to-r from-neon-blue to-neon-violet bg-clip-text text-transparent">Chef {chefName}</span>
+                <h1 className={`text-3xl font-bold ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>
+                  {getTimeBasedGreeting()}, <span className="bg-gradient-to-r from-[#ff7a00] to-[#ff8f2d] bg-clip-text text-transparent">Chef {chefName}</span>
                 </h1>
               </div>
-              <p className="text-gray-500 mt-1">
+              <p className="text-slate-600 mt-1">
                 Manage and track all kitchen workflows in one interface.
               </p>
             </div>
@@ -206,6 +207,18 @@ export default function Dashboard({ chefName }: DashboardProps) {
       />
 
       <CollaborationPanel />
+
+      {/* Floating Team Chat Button - Bottom Right */}
+      {activeSection !== 'chat-hub' && (
+        <button
+          onClick={() => setActiveSection('chat-hub')}
+          className="fixed bottom-6 right-6 p-4 bg-gradient-to-r from-orange-500 to-orange-600 text-white rounded-full shadow-2xl hover:from-orange-600 hover:to-orange-700 transition-all hover:scale-110 z-50 group"
+          title="Open Team Chat"
+        >
+          <MessageSquare size={24} className="group-hover:scale-110 transition-transform" />
+          <span className="absolute -top-1 -right-1 w-3 h-3 bg-green-500 rounded-full border-2 border-white animate-pulse" />
+        </button>
+      )}
     </div>
   );
 }
