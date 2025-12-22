@@ -62,18 +62,11 @@ class ChatService {
     private currentUserId: string | null = null;
     private currentUserName: string = 'Chef';
 
-    // Initialize with current user
     async init() {
         const { data: { user } } = await supabase.auth.getUser();
         if (user) {
             this.currentUserId = user.id;
-            // Get user name from profile
-            const profile = localStorage.getItem('chef_profile');
-            if (profile) {
-                const parsed = JSON.parse(profile);
-                this.currentUserName = parsed.name || 'Chef';
-            }
-            // Update presence to online
+            this.currentUserName = user.user_metadata?.name || user.email?.split('@')[0] || 'Chef';
             await this.updatePresence('online');
         }
         return this.currentUserId;
@@ -188,15 +181,18 @@ class ChatService {
     }
 
     async sendMessage(message: Partial<ChatMessage>): Promise<ChatMessage | null> {
+        if (!this.currentUserId) {
+            console.error('Cannot send message: user not authenticated');
+            return null;
+        }
+
         const newMessage = {
             ...message,
             sender_id: this.currentUserId,
             sender_name: this.currentUserName,
             message_type: message.message_type || 'text',
-            created_at: new Date().toISOString(),
         };
 
-        // Try new chat_messages table
         const { data, error } = await supabase
             .from('chat_messages')
             .insert(newMessage)
@@ -388,10 +384,13 @@ class ChatService {
     }
 
     async getOnlineUsers(): Promise<UserPresence[]> {
+        const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000).toISOString();
+
         const { data, error } = await supabase
             .from('user_presence')
             .select('*')
-            .neq('status', 'offline');
+            .neq('status', 'offline')
+            .gte('last_seen', fiveMinutesAgo);
 
         if (error) {
             console.error('Error fetching online users:', error);

@@ -178,9 +178,15 @@ const KitchenChatHub: React.FC = () => {
         document.addEventListener('visibilitychange', handleVisibilityChange);
         window.addEventListener('beforeunload', handleBeforeUnload);
 
+        const presenceInterval = setInterval(() => {
+            chatService.updatePresence('online');
+            loadOnlineUsers();
+        }, 30000);
+
         return () => {
             document.removeEventListener('visibilitychange', handleVisibilityChange);
             window.removeEventListener('beforeunload', handleBeforeUnload);
+            clearInterval(presenceInterval);
         };
     }, []);
 
