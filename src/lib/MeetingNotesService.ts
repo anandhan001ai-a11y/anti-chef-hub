@@ -333,7 +333,11 @@ JSON ARRAY:`
 
     // Save meeting note to Supabase
     async saveMeetingNote(note: Omit<MeetingNote, 'id' | 'created_at'>): Promise<MeetingNote | null> {
-        // Try Supabase first
+        try {
+            localStorage.removeItem('meeting_notes');
+        } catch {
+        }
+
         const { data, error } = await supabase
             .from('meeting_notes')
             .insert(note)
@@ -342,19 +346,11 @@ JSON ARRAY:`
 
         if (error) {
             console.error('Error saving meeting note:', error);
-            // Save locally as fallback
-            const localNote: MeetingNote = {
+            return {
                 ...note,
-                id: `local-${Date.now()}`,
+                id: `temp-${Date.now()}`,
                 created_at: new Date().toISOString()
-            };
-
-            const stored = localStorage.getItem('meeting_notes') || '[]';
-            const notes = JSON.parse(stored);
-            notes.push(localNote);
-            localStorage.setItem('meeting_notes', JSON.stringify(notes));
-
-            return localNote;
+            } as MeetingNote;
         }
 
         return data;
@@ -372,9 +368,7 @@ JSON ARRAY:`
 
         if (error) {
             console.error('Error fetching meeting notes:', error);
-            // Return local notes as fallback
-            const stored = localStorage.getItem('meeting_notes') || '[]';
-            return JSON.parse(stored);
+            return [];
         }
 
         return data || [];
@@ -386,14 +380,10 @@ JSON ARRAY:`
             .from('meeting_notes')
             .select('summary, transcript')
             .eq('id', noteId)
-            .single();
+            .maybeSingle();
 
         if (error || !data) {
-            // Check local storage
-            const stored = localStorage.getItem('meeting_notes') || '[]';
-            const notes = JSON.parse(stored);
-            const note = notes.find((n: MeetingNote) => n.id === noteId);
-            return note?.summary || note?.transcript || null;
+            return null;
         }
 
         return data.summary || data.transcript;
