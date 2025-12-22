@@ -97,26 +97,22 @@ class ChatService {
 
         if (error) {
             console.error('Error fetching channels:', error);
-            // Return local channels if table doesn't exist
-            return this.getLocalChannels();
+            return this.getDefaultChannels();
         }
 
-        return data || this.getLocalChannels();
+        if (!data || data.length === 0) {
+            return this.getDefaultChannels();
+        }
+
+        return data;
     }
 
-    private getLocalChannels(): Channel[] {
-        const stored = localStorage.getItem('chat_channels');
-        if (stored) {
-            return JSON.parse(stored);
-        }
-        // Create default channels
-        const channels: Channel[] = DEFAULT_CHANNELS.map((ch, i) => ({
+    private getDefaultChannels(): Channel[] {
+        return DEFAULT_CHANNELS.map((ch, i) => ({
             ...ch,
-            id: `local-${i}`,
+            id: `default-${i}`,
             created_at: new Date().toISOString(),
         }));
-        localStorage.setItem('chat_channels', JSON.stringify(channels));
-        return channels;
     }
 
     async createChannel(channel: Omit<Channel, 'id' | 'created_at'>): Promise<Channel | null> {
@@ -131,16 +127,11 @@ class ChatService {
 
         if (error) {
             console.error('Error creating channel:', error);
-            // Create locally
-            const localChannel: Channel = {
+            return {
                 ...channel,
-                id: `local-${Date.now()}`,
+                id: `temp-${Date.now()}`,
                 created_at: new Date().toISOString(),
             };
-            const channels = this.getLocalChannels();
-            channels.push(localChannel);
-            localStorage.setItem('chat_channels', JSON.stringify(channels));
-            return localChannel;
         }
 
         return data;

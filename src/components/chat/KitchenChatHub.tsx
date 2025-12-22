@@ -170,22 +170,18 @@ const KitchenChatHub: React.FC = () => {
 
     // Initialize
     useEffect(() => {
-        const init = async () => {
-            await chatService.init();
+        chatService.init().then(() => {
             loadChannels();
             loadOnlineUsers();
+        });
 
-            // Setup presence on page visibility
-            document.addEventListener('visibilitychange', handleVisibilityChange);
-            window.addEventListener('beforeunload', handleBeforeUnload);
+        document.addEventListener('visibilitychange', handleVisibilityChange);
+        window.addEventListener('beforeunload', handleBeforeUnload);
 
-            return () => {
-                document.removeEventListener('visibilitychange', handleVisibilityChange);
-                window.removeEventListener('beforeunload', handleBeforeUnload);
-            };
+        return () => {
+            document.removeEventListener('visibilitychange', handleVisibilityChange);
+            window.removeEventListener('beforeunload', handleBeforeUnload);
         };
-
-        init();
     }, []);
 
     const handleVisibilityChange = () => {
@@ -213,10 +209,12 @@ const KitchenChatHub: React.FC = () => {
 
     // Load messages when channel changes
     useEffect(() => {
-        if (selectedChannel) {
-            loadMessages();
-            setupRealtimeSubscription();
-        }
+        if (!selectedChannel) return;
+
+        loadMessages();
+        const cleanup = setupRealtimeSubscription();
+
+        return cleanup;
     }, [selectedChannel]);
 
     const loadMessages = async () => {
@@ -226,14 +224,12 @@ const KitchenChatHub: React.FC = () => {
     };
 
     const setupRealtimeSubscription = () => {
-        if (!selectedChannel) return;
+        if (!selectedChannel) return () => {};
 
-        // Subscribe to new messages
         const channel = chatService.subscribeToChannel(selectedChannel.id, (newMsg) => {
             setMessages(prev => [...prev, newMsg]);
         });
 
-        // Subscribe to typing
         const typingChannel = chatService.subscribeToTyping(selectedChannel.id, (userName) => {
             setTypingUsers(prev => {
                 if (!prev.includes(userName)) return [...prev, userName];
@@ -244,7 +240,6 @@ const KitchenChatHub: React.FC = () => {
             }, 3000);
         });
 
-        // Also subscribe to legacy messages
         const legacyChannel = chatService.subscribeToLegacyMessages((newMsg) => {
             setMessages(prev => [...prev, newMsg]);
         });
