@@ -80,6 +80,84 @@ class ChatService {
         return this.currentUserName;
     }
 
+    // ==================== CONVERSATIONS (DMs) ====================
+
+    async getOrCreateConversation(otherUserId: string): Promise<Conversation | null> {
+        if (!this.currentUserId) return null;
+
+        const [p1, p2] = [this.currentUserId, otherUserId].sort();
+
+        const { data: existing } = await supabase
+            .from('conversations')
+            .select('*')
+            .or(`and(participant_1.eq.${p1},participant_2.eq.${p2}),and(participant_1.eq.${p2},participant_2.eq.${p1})`)
+            .maybeSingle();
+
+        if (existing) {
+            return existing;
+        }
+
+        const { data: newConv, error } = await supabase
+            .from('conversations')
+            .insert({
+                participant_1: p1,
+                participant_2: p2,
+            })
+            .select()
+            .single();
+
+        if (error) {
+            console.error('Error creating conversation:', error);
+            return null;
+        }
+
+        return newConv;
+    }
+
+    async getConversations(): Promise<Conversation[]> {
+        if (!this.currentUserId) return [];
+
+        const { data, error } = await supabase
+            .from('conversations')
+            .select('*')
+            .or(`participant_1.eq.${this.currentUserId},participant_2.eq.${this.currentUserId}`)
+            .order('last_message_at', { ascending: false });
+
+        if (error) {
+            console.error('Error fetching conversations:', error);
+            return [];
+        }
+
+        const conversationsWithNames = await Promise.all(
+            (data || []).map(async (conv) => {
+                const otherId = conv.participant_1 === this.currentUserId
+                    ? conv.participant_2
+                    : conv.participant_1;
+
+                const { data: presence } = await supabase
+                    .from('user_presence')
+                    .select('user_name, status')
+                    .eq('user_id', otherId)
+                    .maybeSingle();
+
+                return {
+                    ...conv,
+                    other_user_name: presence?.user_name || 'User',
+                    other_user_status: presence?.status || 'offline',
+                };
+            })
+        );
+
+        return conversationsWithNames;
+    }
+
+    async updateConversationTimestamp(conversationId: string) {
+        await supabase
+            .from('conversations')
+            .update({ last_message_at: new Date().toISOString() })
+            .eq('id', conversationId);
+    }
+
     // ==================== CHANNELS ====================
 
     async getChannels(): Promise<Channel[]> {
@@ -226,6 +304,10 @@ class ChatService {
                 }
             }
             return null;
+        }
+
+        if (message.conversation_id) {
+            this.updateConversationTimestamp(message.conversation_id);
         }
 
         return data;

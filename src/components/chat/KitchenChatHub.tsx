@@ -4,7 +4,7 @@ import {
     Video, Search, Plus, Settings, X, Check, CheckCheck,
     Play, Pause, Square, Smile, ArrowLeft
 } from 'lucide-react';
-import { chatService, Channel, ChatMessage, UserPresence } from '../../lib/ChatService';
+import { chatService, Channel, ChatMessage, UserPresence, Conversation } from '../../lib/ChatService';
 import { supabase } from '../../lib/supabase';
 
 // Voice Recorder Component
@@ -152,6 +152,8 @@ const KitchenChatHub: React.FC = () => {
     // State
     const [channels, setChannels] = useState<Channel[]>([]);
     const [selectedChannel, setSelectedChannel] = useState<Channel | null>(null);
+    const [conversations, setConversations] = useState<Conversation[]>([]);
+    const [selectedConversation, setSelectedConversation] = useState<Conversation | null>(null);
     const [messages, setMessages] = useState<ChatMessage[]>([]);
     const [newMessage, setNewMessage] = useState('');
     const [isRecording, setIsRecording] = useState(false);
@@ -164,6 +166,7 @@ const KitchenChatHub: React.FC = () => {
     const [isMobileView] = useState(false);
     const [showChannelList, setShowChannelList] = useState(true);
     const [imagePreview, setImagePreview] = useState<string | null>(null);
+    const [chatMode, setChatMode] = useState<'channels' | 'dms'>('channels');
 
     const messagesEndRef = useRef<HTMLDivElement>(null);
     const fileInputRef = useRef<HTMLInputElement>(null);
@@ -173,6 +176,7 @@ const KitchenChatHub: React.FC = () => {
         chatService.init().then(() => {
             loadChannels();
             loadOnlineUsers();
+            loadConversations();
         });
 
         document.addEventListener('visibilitychange', handleVisibilityChange);
@@ -213,30 +217,71 @@ const KitchenChatHub: React.FC = () => {
         setOnlineUsers(users);
     };
 
-    // Load messages when channel changes
+    // Load conversations
+    const loadConversations = async () => {
+        const convs = await chatService.getConversations();
+        setConversations(convs);
+    };
+
+    // Handle clicking on an online user to start/open DM
+    const handleUserClick = async (user: UserPresence) => {
+        const currentUserId = chatService.getCurrentUserId();
+        if (user.user_id === currentUserId) return;
+
+        const conversation = await chatService.getOrCreateConversation(user.user_id);
+        if (conversation) {
+            const convWithName: Conversation = {
+                ...conversation,
+                other_user_name: user.user_name,
+                other_user_status: user.status,
+            };
+            setSelectedConversation(convWithName);
+            setSelectedChannel(null);
+            setChatMode('dms');
+            if (!conversations.find(c => c.id === conversation.id)) {
+                setConversations(prev => [convWithName, ...prev]);
+            }
+            if (isMobileView) setShowChannelList(false);
+        }
+    };
+
+    // Load messages when channel or conversation changes
     useEffect(() => {
-        if (!selectedChannel) return;
+        if (!selectedChannel && !selectedConversation) return;
 
         loadMessages();
         const cleanup = setupRealtimeSubscription();
 
         return cleanup;
-    }, [selectedChannel]);
+    }, [selectedChannel, selectedConversation]);
 
     const loadMessages = async () => {
-        if (!selectedChannel) return;
-        const msgs = await chatService.getMessages(selectedChannel.id);
-        setMessages(msgs);
+        if (selectedChannel) {
+            const msgs = await chatService.getMessages(selectedChannel.id);
+            setMessages(msgs);
+        } else if (selectedConversation) {
+            const msgs = await chatService.getMessages(undefined, selectedConversation.id);
+            setMessages(msgs);
+        }
     };
 
     const setupRealtimeSubscription = () => {
-        if (!selectedChannel) return () => {};
+        if (!selectedChannel && !selectedConversation) return () => {};
 
-        const channel = chatService.subscribeToChannel(selectedChannel.id, (newMsg) => {
-            setMessages(prev => [...prev, newMsg]);
-        });
+        const roomId = selectedChannel?.id || selectedConversation?.id || '';
 
-        const typingChannel = chatService.subscribeToTyping(selectedChannel.id, (userName) => {
+        let messageChannel: ReturnType<typeof chatService.subscribeToChannel>;
+        if (selectedChannel) {
+            messageChannel = chatService.subscribeToChannel(selectedChannel.id, (newMsg) => {
+                setMessages(prev => [...prev, newMsg]);
+            });
+        } else if (selectedConversation) {
+            messageChannel = chatService.subscribeToConversation(selectedConversation.id, (newMsg) => {
+                setMessages(prev => [...prev, newMsg]);
+            });
+        }
+
+        const typingChannel = chatService.subscribeToTyping(roomId, (userName) => {
             setTypingUsers(prev => {
                 if (!prev.includes(userName)) return [...prev, userName];
                 return prev;
@@ -251,7 +296,7 @@ const KitchenChatHub: React.FC = () => {
         });
 
         return () => {
-            supabase.removeChannel(channel);
+            if (messageChannel) supabase.removeChannel(messageChannel);
             supabase.removeChannel(typingChannel);
             supabase.removeChannel(legacyChannel);
         };
@@ -264,10 +309,12 @@ const KitchenChatHub: React.FC = () => {
 
     // Send message
     const handleSendMessage = async () => {
-        if (!newMessage.trim() || !selectedChannel) return;
+        if (!newMessage.trim()) return;
+        if (!selectedChannel && !selectedConversation) return;
 
         await chatService.sendMessage({
-            channel_id: selectedChannel.id,
+            channel_id: selectedChannel?.id,
+            conversation_id: selectedConversation?.id,
             content: newMessage.trim(),
             message_type: 'text',
         });
@@ -277,8 +324,9 @@ const KitchenChatHub: React.FC = () => {
 
     // Handle typing
     const handleTyping = () => {
-        if (selectedChannel) {
-            chatService.broadcastTyping(selectedChannel.id);
+        const roomId = selectedChannel?.id || selectedConversation?.id;
+        if (roomId) {
+            chatService.broadcastTyping(roomId);
         }
     };
 
@@ -292,22 +340,22 @@ const KitchenChatHub: React.FC = () => {
 
     // Handle voice message
     const handleVoiceComplete = async (blob: Blob, _duration: number) => {
-        if (!selectedChannel) return;
+        if (!selectedChannel && !selectedConversation) return;
         setIsRecording(false);
-        await chatService.uploadVoiceMessage(blob, selectedChannel.id);
+        await chatService.uploadVoiceMessage(blob, selectedChannel?.id, selectedConversation?.id);
     };
 
     // Handle image upload
     const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
-        if (!file || !selectedChannel) return;
+        if (!file) return;
+        if (!selectedChannel && !selectedConversation) return;
 
-        // Show preview
         const reader = new FileReader();
         reader.onload = () => setImagePreview(reader.result as string);
         reader.readAsDataURL(file);
 
-        await chatService.uploadImage(file, selectedChannel.id);
+        await chatService.uploadImage(file, selectedChannel?.id, selectedConversation?.id);
         setImagePreview(null);
     };
 
@@ -406,6 +454,8 @@ const KitchenChatHub: React.FC = () => {
                             key={channel.id}
                             onClick={() => {
                                 setSelectedChannel(channel);
+                                setSelectedConversation(null);
+                                setChatMode('channels');
                                 if (isMobileView) setShowChannelList(false);
                             }}
                             className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all ${selectedChannel?.id === channel.id
@@ -431,31 +481,75 @@ const KitchenChatHub: React.FC = () => {
                         </button>
                     ))}
 
+                    {/* Direct Messages */}
+                    {conversations.length > 0 && (
+                        <>
+                            <div className="text-xs font-bold text-slate-400 uppercase tracking-wider px-3 py-2 mt-4">
+                                Direct Messages
+                            </div>
+                            {conversations.map(conv => (
+                                <button
+                                    key={conv.id}
+                                    onClick={() => {
+                                        setSelectedConversation(conv);
+                                        setSelectedChannel(null);
+                                        setChatMode('dms');
+                                        if (isMobileView) setShowChannelList(false);
+                                    }}
+                                    className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all ${
+                                        selectedConversation?.id === conv.id
+                                            ? 'bg-gradient-to-r from-blue-500 to-blue-600 text-white shadow-lg'
+                                            : 'hover:bg-slate-100 text-slate-700'
+                                    }`}
+                                >
+                                    <div className="relative">
+                                        <div className="w-8 h-8 bg-gradient-to-br from-blue-500 to-teal-500 rounded-full flex items-center justify-center text-white text-sm font-bold">
+                                            {(conv.other_user_name || 'U').charAt(0).toUpperCase()}
+                                        </div>
+                                        <div className={`absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full border-2 border-white ${
+                                            conv.other_user_status === 'online' ? 'bg-green-500' :
+                                            conv.other_user_status === 'away' ? 'bg-yellow-500' : 'bg-slate-400'
+                                        }`} />
+                                    </div>
+                                    <span className={`text-sm font-medium ${selectedConversation?.id === conv.id ? 'text-white' : ''}`}>
+                                        {conv.other_user_name || 'User'}
+                                    </span>
+                                </button>
+                            ))}
+                        </>
+                    )}
+
                     {/* Online Users */}
-                    <div className="text-xs font-bold text-slate-400 uppercase tracking-wider px-3 py-2 mt-6">
-                        Online ({onlineUsers.length})
+                    <div className="text-xs font-bold text-slate-400 uppercase tracking-wider px-3 py-2 mt-4">
+                        Online ({onlineUsers.filter(u => u.user_id !== chatService.getCurrentUserId()).length})
                     </div>
 
-                    {onlineUsers.map(user => (
-                        <div key={user.user_id} className="flex items-center gap-3 px-3 py-2 rounded-xl hover:bg-slate-100">
+                    {onlineUsers
+                        .filter(user => user.user_id !== chatService.getCurrentUserId())
+                        .map(user => (
+                        <button
+                            key={user.user_id}
+                            onClick={() => handleUserClick(user)}
+                            className="w-full flex items-center gap-3 px-3 py-2 rounded-xl hover:bg-slate-100 transition-colors cursor-pointer text-left"
+                        >
                             <div className="relative">
-                                <div className="w-8 h-8 bg-gradient-to-br from-blue-500 to-purple-500 rounded-full flex items-center justify-center text-white text-sm font-bold">
+                                <div className="w-8 h-8 bg-gradient-to-br from-blue-500 to-teal-500 rounded-full flex items-center justify-center text-white text-sm font-bold">
                                     {user.user_name.charAt(0).toUpperCase()}
                                 </div>
                                 <div className={`absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full border-2 border-white ${user.status === 'online' ? 'bg-green-500' : 'bg-yellow-500'
                                     }`} />
                             </div>
                             <span className="text-sm text-slate-700">{user.user_name}</span>
-                        </div>
+                        </button>
                     ))}
                 </div>
             </div>
 
             {/* Main Chat Area */}
             <div className="flex-1 flex flex-col">
-                {selectedChannel ? (
+                {(selectedChannel || selectedConversation) ? (
                     <>
-                        {/* Channel Header */}
+                        {/* Chat Header */}
                         <div className="h-16 px-6 border-b border-slate-200 flex items-center justify-between bg-white">
                             <div className="flex items-center gap-3">
                                 {isMobileView && (
@@ -463,11 +557,31 @@ const KitchenChatHub: React.FC = () => {
                                         <ArrowLeft size={20} />
                                     </button>
                                 )}
-                                <span className="text-2xl">{selectedChannel.icon}</span>
-                                <div>
-                                    <h3 className="font-bold text-slate-800">#{selectedChannel.name}</h3>
-                                    <p className="text-xs text-slate-500">{selectedChannel.description}</p>
-                                </div>
+                                {selectedChannel ? (
+                                    <>
+                                        <span className="text-2xl">{selectedChannel.icon}</span>
+                                        <div>
+                                            <h3 className="font-bold text-slate-800">#{selectedChannel.name}</h3>
+                                            <p className="text-xs text-slate-500">{selectedChannel.description}</p>
+                                        </div>
+                                    </>
+                                ) : selectedConversation ? (
+                                    <>
+                                        <div className="relative">
+                                            <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-teal-500 rounded-full flex items-center justify-center text-white font-bold">
+                                                {(selectedConversation.other_user_name || 'U').charAt(0).toUpperCase()}
+                                            </div>
+                                            <div className={`absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full border-2 border-white ${
+                                                selectedConversation.other_user_status === 'online' ? 'bg-green-500' :
+                                                selectedConversation.other_user_status === 'away' ? 'bg-yellow-500' : 'bg-slate-400'
+                                            }`} />
+                                        </div>
+                                        <div>
+                                            <h3 className="font-bold text-slate-800">{selectedConversation.other_user_name || 'User'}</h3>
+                                            <p className="text-xs text-slate-500 capitalize">{selectedConversation.other_user_status || 'offline'}</p>
+                                        </div>
+                                    </>
+                                ) : null}
                             </div>
 
                             <div className="flex items-center gap-2">
@@ -487,9 +601,21 @@ const KitchenChatHub: React.FC = () => {
                         <div className="flex-1 overflow-y-auto p-6 space-y-4 bg-slate-50">
                             {messages.length === 0 && (
                                 <div className="text-center py-12">
-                                    <div className="text-6xl mb-4">{selectedChannel.icon}</div>
-                                    <h3 className="text-xl font-bold text-slate-700">Welcome to #{selectedChannel.name}</h3>
-                                    <p className="text-slate-500 mt-2">This is the start of the conversation</p>
+                                    {selectedChannel ? (
+                                        <>
+                                            <div className="text-6xl mb-4">{selectedChannel.icon}</div>
+                                            <h3 className="text-xl font-bold text-slate-700">Welcome to #{selectedChannel.name}</h3>
+                                            <p className="text-slate-500 mt-2">This is the start of the conversation</p>
+                                        </>
+                                    ) : selectedConversation ? (
+                                        <>
+                                            <div className="w-20 h-20 mx-auto mb-4 bg-gradient-to-br from-blue-500 to-teal-500 rounded-full flex items-center justify-center text-white text-3xl font-bold">
+                                                {(selectedConversation.other_user_name || 'U').charAt(0).toUpperCase()}
+                                            </div>
+                                            <h3 className="text-xl font-bold text-slate-700">{selectedConversation.other_user_name}</h3>
+                                            <p className="text-slate-500 mt-2">Start your conversation</p>
+                                        </>
+                                    ) : null}
                                 </div>
                             )}
 
@@ -637,7 +763,7 @@ const KitchenChatHub: React.FC = () => {
                                     {/* Send Button */}
                                     <button
                                         onClick={handleSendMessage}
-                                        disabled={!newMessage.trim()}
+                                        disabled={!newMessage.trim() || (!selectedChannel && !selectedConversation)}
                                         className="p-3 bg-gradient-to-r from-orange-500 to-orange-600 text-white rounded-xl hover:from-orange-600 hover:to-orange-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-lg shadow-orange-500/30"
                                     >
                                         <Send size={20} />
