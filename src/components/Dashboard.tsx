@@ -23,6 +23,7 @@ import SettingsPage from './settings/SettingsPage';
 import CollaborationPanel from './CollaborationPanel';
 import AnalyticsDashboard from './AnalyticsDashboard';
 import KitchenChatHub from './chat/KitchenChatHub';
+import EmailWriter from './email/EmailWriter';
 
 type DashboardProps = {
   chefName: string;
@@ -119,6 +120,13 @@ export default function Dashboard({ chefName }: DashboardProps) {
 
       case 'chat-hub':
         return <KitchenChatHub />;
+
+      case 'email-writer':
+        return (
+          <div className="max-w-3xl mx-auto">
+            <EmailWriter />
+          </div>
+        );
 
       default:
         return (

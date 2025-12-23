@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { CheckSquare, Calculator, Scale, DollarSign, Package, ClipboardCheck, ChefHat, Settings, Sparkles, PenTool, LogOut, Cloud, ChevronDown, ChevronUp, Utensils, MessageSquare } from 'lucide-react';
+import { CheckSquare, Calculator, Scale, DollarSign, Package, ClipboardCheck, ChefHat, Settings, Sparkles, PenTool, LogOut, Cloud, ChevronDown, ChevronUp, Utensils, MessageSquare, Mail } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 
 type SidebarProps = {
@@ -11,6 +11,7 @@ type SidebarProps = {
 const menuItems = [
   { id: 'analytics-dashboard', icon: Cloud, label: 'Kitchen Crew' },
   { id: 'chat-hub', icon: MessageSquare, label: 'Team Chat' },
+  { id: 'email-writer', icon: Mail, label: 'Write Email' },
   { id: 'tasks', icon: CheckSquare, label: 'Tasks' },
   { id: 'cleaning', icon: Sparkles, label: 'Chef Check List' },
   { id: 'inventory', icon: Package, label: 'Inventory' },
