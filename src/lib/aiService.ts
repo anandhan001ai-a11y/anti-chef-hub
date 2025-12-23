@@ -32,7 +32,7 @@ class AIService {
         }
     }
 
-    async sendMessage(prompt: string, context: string = '', _modelOverride?: string): Promise<string> {
+    async sendMessage(prompt: string, context: string = '', _modelOverride?: string, maxTokens: number = 4096): Promise<string> {
         if (!this.openaiKey) this.init();
 
         if (!this.openaiKey) return "⚠️ AI not configured. Please add VITE_OPENAI_API_KEY to .env";
@@ -56,7 +56,7 @@ class AIService {
                         { role: "user", content: userContent }
                     ],
                     temperature: 0.7,
-                    max_tokens: 4096
+                    max_tokens: maxTokens
                 })
             });
 
@@ -68,6 +68,14 @@ class AIService {
 
             const data = await response.json();
             console.log("✅ Sid response received");
+
+            // Check if response was truncated
+            const finishReason = data.choices[0]?.finish_reason;
+            if (finishReason === 'length') {
+                console.warn("⚠️ AI response was truncated due to token limit");
+                return "❌ Response truncated";
+            }
+
             return data.choices[0]?.message?.content || "No response received.";
 
         } catch (error) {
@@ -253,22 +261,38 @@ Return ONLY valid JSON, no markdown.
 
         try {
             console.log("🤖 Sid analyzing roster with OpenAI...");
-            const responseText = await this.sendMessage(prompt, "Roster Analysis");
+            // Use higher token limit for large rosters (16000 tokens = ~50-60 staff members)
+            const responseText = await this.sendMessage(prompt, "Roster Analysis", undefined, 16000);
 
-            // Check if AI returned an error message
+            // Check if AI returned an error message or was truncated
             if (responseText.startsWith('❌') || responseText.startsWith('⚠️')) {
-                console.warn("⚠️ OpenAI not available, using LOCAL parsing...");
+                console.warn("⚠️ OpenAI not available or response truncated, using LOCAL parsing...");
                 return this.localParseRoster(rawData);
             }
 
             // Clean JSON response
             const cleanJson = responseText.replace(/```json/g, '').replace(/```/g, '').trim();
 
+            // Detect if JSON is incomplete (common signs of truncation)
+            if (!cleanJson.endsWith('}') && !cleanJson.endsWith(']')) {
+                console.warn("⚠️ AI response appears truncated (no closing bracket), using LOCAL parsing...");
+                return this.localParseRoster(rawData);
+            }
+
             let analysis;
             try {
                 analysis = JSON.parse(cleanJson);
             } catch (parseError) {
-                console.error("JSON Parse Error:", parseError, "Raw response:", responseText.substring(0, 500));
+                console.error("JSON Parse Error:", parseError);
+                console.error("Raw response (first 500 chars):", responseText.substring(0, 500));
+                console.error("Raw response (last 200 chars):", responseText.substring(Math.max(0, responseText.length - 200)));
+                console.warn("🔄 Falling back to LOCAL parsing...");
+                return this.localParseRoster(rawData);
+            }
+
+            // Validate that we got expected structure
+            if (!analysis.staff || !Array.isArray(analysis.staff)) {
+                console.warn("⚠️ AI response missing staff array, using LOCAL parsing...");
                 return this.localParseRoster(rawData);
             }
 
