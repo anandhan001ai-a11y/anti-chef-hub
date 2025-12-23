@@ -5,7 +5,7 @@ import GoogleCredentialsPage from '../credentials/GoogleCredentialsPage';
 
 export default function SettingsPage() {
     // --- State ---
-    const [activeTab, setActiveTab] = useState<'profile' | 'appearance' | 'team' | 'credentials'>('profile');
+    const [activeTab, setActiveTab] = useState<'profile' | 'appearance' | 'team' | 'credentials' | 'api-keys'>('profile');
     const [profile, setProfile] = useState({
         name: 'Chef Ram',
         role: 'Executive Chef',
@@ -17,6 +17,11 @@ export default function SettingsPage() {
     const [theme, setTheme] = useState('light');
     const [accentColor, setAccentColor] = useState('blue');
     const [saving, setSaving] = useState(false);
+
+    // API Keys State
+    const [openaiKey, setOpenaiKey] = useState('');
+    const [showOpenaiKey, setShowOpenaiKey] = useState(false);
+    const [apiKeySaved, setApiKeySaved] = useState(false);
 
     // Team State
     const [inviteEmail, setInviteEmail] = useState('');
@@ -30,8 +35,10 @@ export default function SettingsPage() {
     useEffect(() => {
         const savedProfile = localStorage.getItem('chef_profile');
         const savedTheme = localStorage.getItem('app_theme');
+        const savedOpenaiKey = localStorage.getItem('OPENAI_API_KEY');
         if (savedProfile) setProfile(JSON.parse(savedProfile));
         if (savedTheme) setTheme(savedTheme);
+        if (savedOpenaiKey) setOpenaiKey(savedOpenaiKey);
     }, []);
 
     useEffect(() => {
@@ -112,6 +119,14 @@ Restaurant: ${profile.restaurant}`;
         navigator.clipboard.writeText(link);
         setCopied(true);
         setTimeout(() => setCopied(false), 2000);
+    };
+
+    const handleSaveApiKeys = () => {
+        if (openaiKey.trim()) {
+            localStorage.setItem('OPENAI_API_KEY', openaiKey.trim());
+            setApiKeySaved(true);
+            setTimeout(() => setApiKeySaved(false), 3000);
+        }
     };
 
     // --- Render ---
@@ -350,6 +365,82 @@ Restaurant: ${profile.restaurant}`;
         </div>
     );
 
+    const renderApiKeys = () => (
+        <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
+            {/* OpenAI API Key */}
+            <div className="bg-gradient-to-br from-green-50 to-blue-50 rounded-2xl p-6 border border-green-100">
+                <div className="flex items-center gap-3 mb-4">
+                    <div className="p-2 bg-green-100 rounded-xl">
+                        <Key size={24} className="text-green-600" />
+                    </div>
+                    <div>
+                        <h3 className="text-lg font-bold text-gray-900">OpenAI API Key</h3>
+                        <p className="text-sm text-gray-500">Required for AI features like Write Mail, Meeting Notes, and Roster Analysis</p>
+                    </div>
+                </div>
+
+                <div className="space-y-4">
+                    <div>
+                        <label className="text-xs font-bold uppercase tracking-wider text-gray-600 mb-2 block">API Key</label>
+                        <div className="relative">
+                            <input
+                                type={showOpenaiKey ? "text" : "password"}
+                                value={openaiKey}
+                                onChange={(e) => setOpenaiKey(e.target.value)}
+                                placeholder="sk-proj-xxxxxxxxxxxxxxxxxxxxx"
+                                className="w-full px-4 py-3 rounded-xl border border-gray-200 bg-white focus:ring-2 focus:ring-green-500 outline-none font-mono text-sm"
+                            />
+                            <button
+                                onClick={() => setShowOpenaiKey(!showOpenaiKey)}
+                                className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                            >
+                                {showOpenaiKey ? 'Hide' : 'Show'}
+                            </button>
+                        </div>
+                    </div>
+
+                    <div className="flex items-center gap-3">
+                        <button
+                            onClick={handleSaveApiKeys}
+                            className="px-6 py-3 bg-green-600 hover:bg-green-700 text-white font-bold rounded-xl transition-all flex items-center gap-2"
+                        >
+                            <Save size={18} />
+                            Save API Key
+                        </button>
+                        {apiKeySaved && (
+                            <div className="flex items-center gap-2 text-green-600 animate-in fade-in">
+                                <CheckCircle size={18} />
+                                <span className="text-sm font-bold">Saved securely!</span>
+                            </div>
+                        )}
+                    </div>
+
+                    <div className="bg-blue-50 border border-blue-200 rounded-xl p-4">
+                        <p className="text-sm text-blue-800 font-medium mb-2">How to get your API key:</p>
+                        <ol className="text-sm text-blue-700 space-y-1 list-decimal list-inside">
+                            <li>Go to <a href="https://platform.openai.com/api-keys" target="_blank" rel="noopener noreferrer" className="underline font-bold hover:text-blue-900">platform.openai.com/api-keys</a></li>
+                            <li>Sign up or log in to your OpenAI account</li>
+                            <li>Click "Create new secret key"</li>
+                            <li>Copy the key (starts with sk-) and paste it above</li>
+                        </ol>
+                    </div>
+
+                    <div className="bg-yellow-50 border border-yellow-200 rounded-xl p-4">
+                        <p className="text-sm text-yellow-800">
+                            <span className="font-bold">Note:</span> Your API key is stored securely in your browser and never sent to any third-party servers except OpenAI when you use AI features.
+                        </p>
+                    </div>
+                </div>
+            </div>
+
+            {/* Future: Other API Keys */}
+            <div className="bg-gray-50 rounded-2xl p-6 border border-gray-100">
+                <h4 className="font-bold text-gray-900 mb-2">Other API Integrations</h4>
+                <p className="text-sm text-gray-500">Additional API integrations will appear here as they become available.</p>
+            </div>
+        </div>
+    );
+
     return (
         <div className="max-w-4xl mx-auto p-6 lg:p-10 pb-32">
             <div className="flex justify-between items-center mb-12">
@@ -394,6 +485,12 @@ Restaurant: ${profile.restaurant}`;
                     >
                         <Key size={18} /> Google Credentials
                     </button>
+                    <button
+                        onClick={() => setActiveTab('api-keys')}
+                        className={`flex items-center gap-3 px-4 py-3 rounded-xl font-bold text-sm transition-all ${activeTab === 'api-keys' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-900 hover:bg-gray-100'}`}
+                    >
+                        <Key size={18} /> API Keys
+                    </button>
                 </div>
 
                 {/* Content Area */}
@@ -406,6 +503,7 @@ Restaurant: ${profile.restaurant}`;
                             <GoogleCredentialsPage />
                         </div>
                     )}
+                    {activeTab === 'api-keys' && renderApiKeys()}
                 </div>
             </div>
         </div>
