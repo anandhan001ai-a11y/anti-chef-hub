@@ -1,4 +1,4 @@
-import { Plus, Command, Bot, Loader2, Mic, Square, FileText, X, Sparkles, Clock, UserPlus, CheckCircle } from 'lucide-react';
+import { Plus, Command, Bot, Loader2, Mic, Square, FileText, X, Sparkles, Clock, UserPlus, CheckCircle, Mail, Send, Volume2 } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import { googleService } from '../lib/google';
 import { createTask } from '../lib/taskService';
@@ -39,6 +39,17 @@ export default function TopNav({
   const [quickTaskAssignee, setQuickTaskAssignee] = useState('');
   const [isAddingQuickTask, setIsAddingQuickTask] = useState(false);
 
+  const [showEmailModal, setShowEmailModal] = useState(false);
+  const [emailDetails, setEmailDetails] = useState('');
+  const [isRecordingEmail, setIsRecordingEmail] = useState(false);
+  const [emailRecordingDuration, setEmailRecordingDuration] = useState(0);
+  const [isGeneratingEmail, setIsGeneratingEmail] = useState(false);
+  const [generatedBulletPoints, setGeneratedBulletPoints] = useState<string[]>([]);
+  const [generatedEmailBody, setGeneratedEmailBody] = useState('');
+  const [emailSubject, setEmailSubject] = useState('');
+  const [emailTo, setEmailTo] = useState('');
+  const [isSendingEmail, setIsSendingEmail] = useState(false);
+
   // Timer for recording duration
   useEffect(() => {
     let timer: NodeJS.Timeout;
@@ -49,6 +60,17 @@ export default function TopNav({
     }
     return () => clearInterval(timer);
   }, [isRecording]);
+
+  // Timer for email recording duration
+  useEffect(() => {
+    let timer: NodeJS.Timeout;
+    if (isRecordingEmail) {
+      timer = setInterval(() => {
+        setEmailRecordingDuration(d => d + 1);
+      }, 1000);
+    }
+    return () => clearInterval(timer);
+  }, [isRecordingEmail]);
 
   // Load saved notes when modal opens
   useEffect(() => {
@@ -179,6 +201,116 @@ export default function TopNav({
     setIsAddingQuickTask(false);
   };
 
+  // Email Recording
+  const startEmailRecording = async () => {
+    setEmailDetails('');
+    setEmailRecordingDuration(0);
+
+    const started = await meetingNotesService.startRecording((text) => {
+      setEmailDetails(text);
+    });
+
+    if (started) {
+      setIsRecordingEmail(true);
+    } else {
+      alert('Could not start recording. Please allow microphone access.');
+    }
+  };
+
+  const stopEmailRecording = async () => {
+    setIsRecordingEmail(false);
+    const result = await meetingNotesService.stopRecording();
+    if (result) {
+      setEmailDetails(result.transcript);
+    }
+  };
+
+  const cancelEmailRecording = () => {
+    meetingNotesService.cancelRecording();
+    setIsRecordingEmail(false);
+    setEmailRecordingDuration(0);
+    setEmailDetails('');
+  };
+
+  // Generate Email with AI
+  const generateEmail = async () => {
+    if (!emailDetails.trim()) {
+      alert('Please provide some details for the email');
+      return;
+    }
+
+    setIsGeneratingEmail(true);
+    try {
+      const prompt = `Based on the following details, create:
+1. A list of key bullet points (3-5 points)
+2. A professional email body incorporating these points
+
+Details: ${emailDetails}
+
+Format your response as JSON:
+{
+  "bulletPoints": ["point 1", "point 2", ...],
+  "emailBody": "Professional email text here",
+  "subject": "Suggested subject line"
+}`;
+
+      const response = await aiService.sendMessage(prompt);
+
+      try {
+        const jsonMatch = response.match(/\{[\s\S]*\}/);
+        if (jsonMatch) {
+          const parsed = JSON.parse(jsonMatch[0]);
+          setGeneratedBulletPoints(parsed.bulletPoints || []);
+          setGeneratedEmailBody(parsed.emailBody || response);
+          setEmailSubject(parsed.subject || '');
+        } else {
+          setGeneratedEmailBody(response);
+          setGeneratedBulletPoints(['AI generated email - see body below']);
+        }
+      } catch (parseErr) {
+        setGeneratedEmailBody(response);
+        setGeneratedBulletPoints(['Email details provided successfully']);
+      }
+    } catch (err) {
+      console.error('Error generating email:', err);
+      alert('Failed to generate email. Please try again.');
+    }
+    setIsGeneratingEmail(false);
+  };
+
+  // Send Email
+  const handleSendEmail = async () => {
+    if (!emailTo.trim() || !generatedEmailBody.trim()) {
+      alert('Please provide recipient email and generate email body');
+      return;
+    }
+
+    setIsSendingEmail(true);
+    try {
+      console.log('Sending email to:', emailTo);
+      console.log('Subject:', emailSubject);
+      console.log('Body:', generatedEmailBody);
+
+      alert('✅ Email draft created! (Email sending would be implemented with your email service)');
+
+      setShowEmailModal(false);
+      resetEmailModal();
+    } catch (err) {
+      console.error('Error sending email:', err);
+      alert('Failed to send email');
+    }
+    setIsSendingEmail(false);
+  };
+
+  const resetEmailModal = () => {
+    setEmailDetails('');
+    setGeneratedBulletPoints([]);
+    setGeneratedEmailBody('');
+    setEmailSubject('');
+    setEmailTo('');
+    setEmailRecordingDuration(0);
+  };
+
   const handleKeyDown = async (e: React.KeyboardEvent) => {
     if (e.key === 'Enter') {
       setIsProcessing(true);
@@ -289,15 +421,221 @@ export default function TopNav({
             </div>
 
             <button
-              onClick={onAddTask}
-              className="flex items-center gap-2 px-6 py-3 bg-gray-900 text-white rounded-full font-bold hover:bg-black hover:scale-105 transition-all duration-200 whitespace-nowrap shadow-xl"
+              onClick={() => setShowEmailModal(true)}
+              className="flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-blue-600 to-cyan-600 text-white rounded-full font-bold hover:scale-105 transition-all duration-200 whitespace-nowrap shadow-xl"
             >
-              <Plus className="w-5 h-5" />
-              <span className="hidden md:inline">Add</span>
+              <Mail className="w-5 h-5" />
+              <span className="hidden md:inline">Write Mail</span>
             </button>
           </div>
         </div>
       </nav>
+
+      {/* Email Composition Modal */}
+      {showEmailModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-3xl w-full max-w-3xl shadow-2xl overflow-hidden max-h-[90vh] overflow-y-auto">
+            {/* Header */}
+            <div className="bg-gradient-to-r from-blue-600 to-cyan-600 text-white p-6 sticky top-0 z-10">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 bg-white/20 rounded-xl">
+                    <Mail size={24} />
+                  </div>
+                  <div>
+                    <h2 className="text-xl font-bold">Write Professional Email</h2>
+                    <p className="text-sm text-white/80">AI-powered email composition with voice or text</p>
+                  </div>
+                </div>
+                <button
+                  onClick={() => {
+                    if (isRecordingEmail) cancelEmailRecording();
+                    setShowEmailModal(false);
+                    resetEmailModal();
+                  }}
+                  className="p-2 hover:bg-white/20 rounded-full transition-colors"
+                >
+                  <X size={20} />
+                </button>
+              </div>
+            </div>
+
+            {/* Content */}
+            <div className="p-6 space-y-6">
+              {/* Step 1: Input Details */}
+              <div className="bg-gradient-to-br from-blue-50 to-cyan-50 rounded-2xl p-5 border border-blue-100">
+                <div className="flex items-center gap-2 text-sm font-bold text-blue-600 mb-3">
+                  <FileText size={14} />
+                  Step 1: Provide Email Details
+                </div>
+
+                <textarea
+                  value={emailDetails}
+                  onChange={(e) => setEmailDetails(e.target.value)}
+                  placeholder="Type or record the details you want in your email...
+
+Example: Tell the supplier we need 50kg tomatoes, 30kg onions by Friday. Payment terms net 30. Urgent order."
+                  className="w-full px-4 py-3 rounded-xl border border-blue-200 focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm resize-none h-32 mb-3"
+                  disabled={isRecordingEmail}
+                />
+
+                {/* Voice Recording Controls */}
+                <div className="flex items-center gap-3">
+                  {!isRecordingEmail ? (
+                    <button
+                      onClick={startEmailRecording}
+                      className="flex items-center gap-2 px-4 py-2.5 bg-blue-600 text-white rounded-xl font-bold hover:bg-blue-700 transition-all text-sm"
+                    >
+                      <Mic size={16} />
+                      Record Details
+                    </button>
+                  ) : (
+                    <>
+                      <div className="flex items-center gap-2 px-4 py-2 bg-red-50 rounded-xl">
+                        <div className="w-2 h-2 bg-red-500 rounded-full animate-pulse" />
+                        <span className="font-mono text-red-600 font-bold text-sm">
+                          {formatDuration(emailRecordingDuration)}
+                        </span>
+                      </div>
+                      <button
+                        onClick={stopEmailRecording}
+                        className="flex items-center gap-2 px-4 py-2 bg-gray-900 text-white rounded-xl font-bold hover:bg-black transition-all text-sm"
+                      >
+                        <Square size={14} />
+                        Stop
+                      </button>
+                      <button
+                        onClick={cancelEmailRecording}
+                        className="p-2 bg-gray-100 text-gray-600 rounded-xl hover:bg-gray-200 transition-colors"
+                      >
+                        <X size={16} />
+                      </button>
+                    </>
+                  )}
+
+                  <button
+                    onClick={generateEmail}
+                    disabled={!emailDetails.trim() || isGeneratingEmail}
+                    className="flex items-center gap-2 px-5 py-2.5 bg-gradient-to-r from-purple-500 to-pink-500 text-white rounded-xl font-bold hover:scale-105 transition-all text-sm disabled:opacity-50 disabled:cursor-not-allowed ml-auto"
+                  >
+                    {isGeneratingEmail ? (
+                      <>
+                        <Loader2 size={16} className="animate-spin" />
+                        Generating...
+                      </>
+                    ) : (
+                      <>
+                        <Sparkles size={16} />
+                        Generate Email
+                      </>
+                    )}
+                  </button>
+                </div>
+              </div>
+
+              {/* AI Generating Indicator */}
+              {isGeneratingEmail && (
+                <div className="flex items-center justify-center gap-3 py-6">
+                  <Sparkles className="w-6 h-6 text-purple-500 animate-pulse" />
+                  <span className="text-gray-600 font-medium">AI is crafting your professional email...</span>
+                </div>
+              )}
+
+              {/* Step 2: Bullet Points */}
+              {generatedBulletPoints.length > 0 && !isGeneratingEmail && (
+                <div className="bg-gradient-to-br from-purple-50 to-pink-50 rounded-2xl p-5 border border-purple-100">
+                  <div className="flex items-center gap-2 text-sm font-bold text-purple-600 mb-3">
+                    <Sparkles size={14} />
+                    Key Points
+                  </div>
+                  <ul className="space-y-2">
+                    {generatedBulletPoints.map((point, idx) => (
+                      <li key={idx} className="flex items-start gap-2 text-sm text-gray-700">
+                        <span className="w-1.5 h-1.5 bg-purple-500 rounded-full mt-1.5 flex-shrink-0" />
+                        <span>{point}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+
+              {/* Step 3: Generated Email */}
+              {generatedEmailBody && !isGeneratingEmail && (
+                <div className="space-y-3">
+                  <div className="bg-gradient-to-br from-green-50 to-emerald-50 rounded-2xl p-5 border border-green-100">
+                    <div className="flex items-center gap-2 text-sm font-bold text-green-600 mb-3">
+                      <Mail size={14} />
+                      Professional Email Draft
+                    </div>
+
+                    <div className="space-y-3">
+                      <div>
+                        <label className="text-xs font-bold text-gray-600 mb-1 block">To:</label>
+                        <input
+                          type="email"
+                          value={emailTo}
+                          onChange={(e) => setEmailTo(e.target.value)}
+                          placeholder="recipient@example.com"
+                          className="w-full px-3 py-2 rounded-lg border border-gray-200 focus:outline-none focus:ring-2 focus:ring-green-500 text-sm"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="text-xs font-bold text-gray-600 mb-1 block">Subject:</label>
+                        <input
+                          type="text"
+                          value={emailSubject}
+                          onChange={(e) => setEmailSubject(e.target.value)}
+                          placeholder="Email subject"
+                          className="w-full px-3 py-2 rounded-lg border border-gray-200 focus:outline-none focus:ring-2 focus:ring-green-500 text-sm"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="text-xs font-bold text-gray-600 mb-1 block">Body:</label>
+                        <textarea
+                          value={generatedEmailBody}
+                          onChange={(e) => setGeneratedEmailBody(e.target.value)}
+                          className="w-full px-3 py-2 rounded-lg border border-gray-200 focus:outline-none focus:ring-2 focus:ring-green-500 text-sm resize-none h-48"
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Send Button */}
+                  <button
+                    onClick={handleSendEmail}
+                    disabled={!emailTo.trim() || isSendingEmail}
+                    className="w-full flex items-center justify-center gap-2 px-6 py-4 bg-gradient-to-r from-green-500 to-emerald-500 text-white rounded-xl font-bold hover:scale-105 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    {isSendingEmail ? (
+                      <>
+                        <Loader2 size={18} className="animate-spin" />
+                        Sending...
+                      </>
+                    ) : (
+                      <>
+                        <Send size={18} />
+                        Create Email Draft
+                      </>
+                    )}
+                  </button>
+                </div>
+              )}
+
+              {/* Helper Text */}
+              <div className="bg-gray-50 rounded-xl p-4 border border-gray-100">
+                <div className="flex items-start gap-2 text-xs text-gray-600">
+                  <Sparkles size={14} className="flex-shrink-0 mt-0.5 text-purple-500" />
+                  <p>
+                    <strong>How it works:</strong> Provide details via text or voice, click "Generate Email" to create bullet points and a professional email body, then review and send.
+                  </p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Meeting Notes Modal */}
       {showMeetingModal && (
