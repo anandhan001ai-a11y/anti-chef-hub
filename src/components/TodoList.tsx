@@ -4,10 +4,9 @@ import { Check, Plus, Loader2, AlertCircle, Trash2, Database } from 'lucide-reac
 
 type TodoListProps = {
   onTaskClick: (task: Task) => void;
-  searchQuery: string;
 };
 
-export default function TodoList({ onTaskClick, searchQuery }: TodoListProps) {
+export default function TodoList({ onTaskClick }: TodoListProps) {
   const [tasks, setTasks] = useState<Task[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -42,15 +41,8 @@ export default function TodoList({ onTaskClick, searchQuery }: TodoListProps) {
     setLoading(false);
   };
 
-  // Filter tasks by search
-  const filteredTasks = tasks.filter((task) => {
-    const matchesSearch = task.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      (task.description?.toLowerCase().includes(searchQuery.toLowerCase()) ?? false);
-    return matchesSearch;
-  });
-
   // Sort: pending first, then by sort_index
-  const sortedTasks = [...filteredTasks].sort((a, b) => {
+  const sortedTasks = [...tasks].sort((a, b) => {
     if (a.status !== b.status) {
       return a.status === 'pending' ? -1 : 1;
     }

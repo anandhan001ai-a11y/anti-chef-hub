@@ -31,7 +31,6 @@ type DashboardProps = {
 export default function Dashboard({ chefName }: DashboardProps) {
   const [activeSection, setActiveSection] = useState('analytics-dashboard');
   const [activeFilter, setActiveFilter] = useState('Full Year');
-  const [searchQuery, setSearchQuery] = useState('');
   const [isAddTaskModalOpen, setIsAddTaskModalOpen] = useState(false);
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
   const [isTaskDrawerOpen, setIsTaskDrawerOpen] = useState(false);
@@ -80,7 +79,7 @@ export default function Dashboard({ chefName }: DashboardProps) {
         return (
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 h-full">
             <div className="lg:col-span-3">
-              <TasksPage onTaskClick={handleTaskClick} searchQuery={searchQuery} />
+              <TasksPage onTaskClick={handleTaskClick} />
             </div>
           </div>
         );
@@ -147,8 +146,6 @@ export default function Dashboard({ chefName }: DashboardProps) {
         <TopNav
           activeFilter={activeFilter}
           setActiveFilter={setActiveFilter}
-          searchQuery={searchQuery}
-          setSearchQuery={setSearchQuery}
           onAddTask={() => handleAddTask()}
           activeSection={activeSection}
         />
@@ -171,8 +168,8 @@ export default function Dashboard({ chefName }: DashboardProps) {
             <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
               <div className="xl:col-span-2 space-y-6">
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                  <TodoList onTaskClick={handleTaskClick} searchQuery={searchQuery} />
-                  <KanbanBoard onTaskClick={handleTaskClick} searchQuery={searchQuery} />
+                  <TodoList onTaskClick={handleTaskClick} />
+                  <KanbanBoard onTaskClick={handleTaskClick} />
                 </div>
               </div>
               <div className="space-y-6">

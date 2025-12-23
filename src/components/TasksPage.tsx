@@ -6,10 +6,9 @@ import KanbanBoard from './KanbanBoard';
 
 type TasksPageProps = {
     onTaskClick: (task: Task) => void;
-    searchQuery: string;
 };
 
-export default function TasksPage({ onTaskClick, searchQuery }: TasksPageProps) {
+export default function TasksPage({ onTaskClick }: TasksPageProps) {
     const [viewMode, setViewMode] = useState<'list' | 'board'>('list');
 
     return (
@@ -45,9 +44,9 @@ export default function TasksPage({ onTaskClick, searchQuery }: TasksPageProps) 
             {/* Content */}
             <div className="flex-1 overflow-hidden">
                 {viewMode === 'list' ? (
-                    <TodoList onTaskClick={onTaskClick} searchQuery={searchQuery} />
+                    <TodoList onTaskClick={onTaskClick} />
                 ) : (
-                    <KanbanBoard onTaskClick={onTaskClick} searchQuery={searchQuery} />
+                    <KanbanBoard onTaskClick={onTaskClick} />
                 )}
             </div>
         </div>

@@ -4,12 +4,11 @@ import { Plus, Loader2, AlertCircle, Database, Trash2 } from 'lucide-react';
 
 type KanbanBoardProps = {
   onTaskClick: (task: Task) => void;
-  searchQuery: string;
 };
 
 type Column = 'pending' | 'completed';
 
-export default function KanbanBoard({ onTaskClick, searchQuery }: KanbanBoardProps) {
+export default function KanbanBoard({ onTaskClick }: KanbanBoardProps) {
   const [tasks, setTasks] = useState<Task[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -42,18 +41,13 @@ export default function KanbanBoard({ onTaskClick, searchQuery }: KanbanBoardPro
     setLoading(false);
   };
 
-  const filteredTasks = tasks.filter((task) =>
-    task.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    (task.description?.toLowerCase().includes(searchQuery.toLowerCase()) ?? false)
-  );
-
   const columns: { id: Column; title: string; color: string; bgColor: string }[] = [
     { id: 'pending', title: 'To Do', color: 'border-[#ff7a00]', bgColor: 'bg-orange-50' },
     { id: 'completed', title: 'Done', color: 'border-green-500', bgColor: 'bg-green-50' },
   ];
 
   const getTasksByStatus = (status: Column) => {
-    return filteredTasks.filter((task) => task.status === status);
+    return tasks.filter((task) => task.status === status);
   };
 
   const handleDragStart = (task: Task) => {
