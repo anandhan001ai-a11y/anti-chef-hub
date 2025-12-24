@@ -9,7 +9,16 @@ interface MenuMeal {
   [category: string]: MenuItem[];
 }
 
+interface DateInfo {
+  day_of_week: string;
+  month: string;
+  day: number;
+  formatted: string;
+  short: string;
+}
+
 interface MenuDayData {
+  date_info?: DateInfo | null;
   breakfast: MenuMeal;
   lunch: MenuMeal;
   dinner: MenuMeal;
@@ -18,6 +27,7 @@ interface MenuDayData {
 interface MenuData {
   loaded_at: string;
   source_file: string;
+  date_mapping?: Record<string, DateInfo>;
   days: {
     [day: number]: MenuDayData;
   };
@@ -40,6 +50,36 @@ class MenuAIService {
     CE: 'Celery',
     SU: 'Sulphites',
     CR: 'Crustaceans'
+  };
+
+  private defaultDateMapping: Record<string, DateInfo> = {
+    '1': { day_of_week: 'Thursday', month: 'January', day: 8, formatted: 'Thursday, January 8', short: 'Jan 8' },
+    '2': { day_of_week: 'Friday', month: 'January', day: 9, formatted: 'Friday, January 9', short: 'Jan 9' },
+    '3': { day_of_week: 'Saturday', month: 'January', day: 10, formatted: 'Saturday, January 10', short: 'Jan 10' },
+    '4': { day_of_week: 'Sunday', month: 'December', day: 14, formatted: 'Sunday, December 14', short: 'Dec 14' },
+    '5': { day_of_week: 'Monday', month: 'December', day: 15, formatted: 'Monday, December 15', short: 'Dec 15' },
+    '6': { day_of_week: 'Tuesday', month: 'December', day: 16, formatted: 'Tuesday, December 16', short: 'Dec 16' },
+    '7': { day_of_week: 'Wednesday', month: 'December', day: 17, formatted: 'Wednesday, December 17', short: 'Dec 17' },
+    '8': { day_of_week: 'Thursday', month: 'December', day: 18, formatted: 'Thursday, December 18', short: 'Dec 18' },
+    '9': { day_of_week: 'Friday', month: 'December', day: 19, formatted: 'Friday, December 19', short: 'Dec 19' },
+    '10': { day_of_week: 'Saturday', month: 'December', day: 20, formatted: 'Saturday, December 20', short: 'Dec 20' },
+    '11': { day_of_week: 'Sunday', month: 'December', day: 21, formatted: 'Sunday, December 21', short: 'Dec 21' },
+    '12': { day_of_week: 'Monday', month: 'December', day: 22, formatted: 'Monday, December 22', short: 'Dec 22' },
+    '13': { day_of_week: 'Tuesday', month: 'December', day: 23, formatted: 'Tuesday, December 23', short: 'Dec 23' },
+    '14': { day_of_week: 'Wednesday', month: 'December', day: 24, formatted: 'Wednesday, December 24', short: 'Dec 24' },
+    '15': { day_of_week: 'Thursday', month: 'December', day: 25, formatted: 'Thursday, December 25', short: 'Dec 25' },
+    '16': { day_of_week: 'Friday', month: 'December', day: 26, formatted: 'Friday, December 26', short: 'Dec 26' },
+    '17': { day_of_week: 'Saturday', month: 'December', day: 27, formatted: 'Saturday, December 27', short: 'Dec 27' },
+    '18': { day_of_week: 'Sunday', month: 'December', day: 28, formatted: 'Sunday, December 28', short: 'Dec 28' },
+    '19': { day_of_week: 'Monday', month: 'December', day: 29, formatted: 'Monday, December 29', short: 'Dec 29' },
+    '20': { day_of_week: 'Tuesday', month: 'December', day: 30, formatted: 'Tuesday, December 30', short: 'Dec 30' },
+    '21': { day_of_week: 'Wednesday', month: 'December', day: 31, formatted: 'Wednesday, December 31', short: 'Dec 31' },
+    '22': { day_of_week: 'Thursday', month: 'January', day: 1, formatted: 'Thursday, January 1', short: 'Jan 1' },
+    '23': { day_of_week: 'Friday', month: 'January', day: 2, formatted: 'Friday, January 2', short: 'Jan 2' },
+    '24': { day_of_week: 'Saturday', month: 'January', day: 3, formatted: 'Saturday, January 3', short: 'Jan 3' },
+    '26': { day_of_week: 'Monday', month: 'January', day: 5, formatted: 'Monday, January 5', short: 'Jan 5' },
+    '27': { day_of_week: 'Tuesday', month: 'January', day: 6, formatted: 'Tuesday, January 6', short: 'Jan 6' },
+    '28': { day_of_week: 'Wednesday', month: 'January', day: 7, formatted: 'Wednesday, January 7', short: 'Jan 7' }
   };
 
   setMenuData(data: MenuData) {
@@ -68,40 +108,60 @@ class MenuAIService {
       .map(([code, name]) => `${code}=${name}`)
       .join(', ');
 
+    const dateMapping = this.currentMenu.date_mapping || this.defaultDateMapping;
+    const dateMapList = Object.entries(dateMapping)
+      .map(([day, info]) => `- Day ${day} = ${info.formatted}`)
+      .join('\n');
+
     const menuDataJson = JSON.stringify(this.currentMenu.days, null, 2);
 
-    this.systemPrompt = `# TROJENA Menu Assistant - Complete 28-Day Menu Cycle
+    this.systemPrompt = `# TROJENA Menu Assistant (with Date Support)
 
-You are an expert menu assistant with access to TROJENA's complete 28-Day Menu Cycle (28DMC).
+You are a menu assistant for TROJENA's 28-Day Menu Cycle. You can answer questions using EITHER day numbers OR actual dates.
 
-## ALLERGEN CODES REFERENCE
+## DATE MAPPING
+
+Users can ask using:
+- Day numbers: "Day 5", "Day 12"
+- Full dates: "December 14", "December 25"
+- Short dates: "Dec 14", "Dec 25"
+- Day + Date: "What's for lunch on Sunday December 14?"
+
+## CURRENT DATE MAPPING:
+
+${dateMapList}
+
+## ALLERGEN CODES
 ${allergenCodesList}
 
-## KEY INFORMATION
-- Menu cycles every 28 days (Dec 14 - Jan 10)
-- Three meals daily: Breakfast, Lunch, Dinner
-- Each item may include allergen codes in parentheses
-- Weeks are organized in the data structure below
-
-## HOW TO ANSWER QUESTIONS
-1. **Specific Day Queries**: Reference the exact day number (1-28) and meal period
-2. **Allergen Questions**: Always mention which allergens (codes) are in/not in items
-3. **Dietary Restrictions**: Filter by allergen codes to provide safe options
-4. **Menu Rotations**: Highlight which items appear multiple times in the cycle
-5. **Special Events**: Note Christmas (Day 15), New Year's (Days 21-22)
-
 ## RESPONSE FORMAT
-- For day queries: List items organized by category
-- Always include allergen codes in parentheses when listing items
-- Be specific about which meal (breakfast/lunch/dinner)
-- Suggest alternatives if items contain allergens
+
+When answering:
+1. **Confirm the date**: "On Day 5 (Monday, December 15)..."
+2. **List key items by category**
+3. **Always include allergen codes**
+
+## EXAMPLE RESPONSES
+
+**Q: "What's for breakfast on December 14?"**
+A: "On Day 4 (Sunday, December 14), breakfast includes:
+- Category 1: Item Name (AL, LE)
+- Category 2: Item Name
+..."
+
+**Q: "What's for lunch on Christmas Day?"**
+A: "On Day 15 (Thursday, December 25), lunch features:
+- Category 1: Item Name (AL)
+- Category 2: Item Name
+..."
 
 ## COMPLETE MENU DATA
+
 \`\`\`json
 ${menuDataJson}
 \`\`\`
 
-Now help the user with their menu questions. Be thorough, organized, and always mention allergens.`;
+Now help the user with their menu questions. Be thorough, organized, and always mention allergens when relevant.`;
   }
 
   async queryMenu(question: string): Promise<string> {
@@ -142,12 +202,14 @@ Now help the user with their menu questions. Be thorough, organized, and always 
           const menuData: MenuData = {
             loaded_at: new Date().toISOString(),
             source_file: file.name,
+            date_mapping: this.defaultDateMapping,
             days: {}
           };
 
-          // Initialize all 28 days
+          // Initialize all 28 days with date info
           for (let i = 1; i <= 28; i++) {
             menuData.days[i] = {
+              date_info: this.defaultDateMapping[String(i)] || null,
               breakfast: {},
               lunch: {},
               dinner: {}

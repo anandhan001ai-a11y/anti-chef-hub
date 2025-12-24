@@ -19,7 +19,7 @@ export default function MenuAI({ isOpen, onClose }: MenuAIProps) {
     {
       id: '1',
       role: 'assistant',
-      content: 'Hello! I\'m your Menu AI assistant. Upload a menu file and ask me anything about what\'s being served. You can ask about specific days, ingredients, allergens, or meal options.',
+      content: 'Hello! I\'m your Menu AI assistant. Upload a menu file and ask me anything about what\'s being served. You can ask using day numbers (Day 5) or actual dates (December 15, Christmas, etc.). I can help with ingredients, allergens, dietary options, and more.',
       timestamp: new Date()
     }
   ]);
@@ -261,7 +261,7 @@ export default function MenuAI({ isOpen, onClose }: MenuAIProps) {
                 type="text"
                 value={query}
                 onChange={e => setQuery(e.target.value)}
-                placeholder="Ask about the menu... (e.g., What's for breakfast on Day 5?)"
+                placeholder="Ask about the menu... (e.g., What's for breakfast on December 15? or Day 5?)"
                 disabled={isLoading}
                 className="flex-1 px-4 py-2.5 bg-slate-700 border border-slate-600 rounded-lg text-slate-100 placeholder-slate-400 focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500 disabled:opacity-50"
               />
