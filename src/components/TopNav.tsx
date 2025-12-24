@@ -1,8 +1,9 @@
-import { Plus, Mic, Square, FileText, X, Sparkles, Clock, UserPlus, CheckCircle, Mail, Send, Loader2 } from 'lucide-react';
+import { Plus, Mic, Square, FileText, X, Sparkles, Clock, UserPlus, CheckCircle, Mail, Send, Loader2, ChefHat } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import { createTask } from '../lib/taskService';
 import { aiService } from '../lib/aiService';
 import { meetingNotesService, MeetingNote, ActionItem } from '../lib/MeetingNotesService';
+import MenuAI from './menu/MenuAI';
 
 type TopNavProps = {
   activeFilter: string;
@@ -43,6 +44,7 @@ export default function TopNav({
   const [emailSubject, setEmailSubject] = useState('');
   const [emailTo, setEmailTo] = useState('');
   const [isSendingEmail, setIsSendingEmail] = useState(false);
+  const [showMenuAI, setShowMenuAI] = useState(false);
 
   // Timer for recording duration
   useEffect(() => {
@@ -321,6 +323,15 @@ Format your response as JSON:
               Meeting Notes
             </button>
 
+            {/* Menu AI Button */}
+            <button
+              onClick={() => setShowMenuAI(true)}
+              className="px-4 lg:px-6 py-2 rounded-full text-xs lg:text-sm font-bold transition-all duration-200 whitespace-nowrap bg-gradient-to-r from-amber-600 to-orange-600 text-white shadow-lg shadow-amber-200 hover:scale-105 flex items-center gap-2"
+            >
+              <ChefHat size={14} />
+              Menu AI
+            </button>
+
             {activeSection !== 'whiteboard' && filters.map((filter) => (
               <button
                 key={filter}
@@ -553,6 +564,9 @@ Example: Tell the supplier we need 50kg tomatoes, 30kg onions by Friday. Payment
           </div>
         </div>
       )}
+
+      {/* Menu AI Modal */}
+      <MenuAI isOpen={showMenuAI} onClose={() => setShowMenuAI(false)} />
 
       {/* Meeting Notes Modal */}
       {showMeetingModal && (
