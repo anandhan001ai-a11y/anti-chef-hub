@@ -189,82 +189,169 @@ Now help the user with their menu questions. Be thorough, organized, and always 
   }
 
   private parseBreakfastSheet(rows: any[][], menuData: MenuData) {
-    let currentCategory: string | null = null;
+    // Find where actual data starts (skip headers)
+    let dataStartRow = 0;
+    for (let i = 0; i < Math.min(5, rows.length); i++) {
+      const row = rows[i];
+      if (row && row.length > 2) {
+        // Check if row contains numeric indicators of days
+        const hasNumbers = row.some(cell => {
+          const text = this.cleanText(cell);
+          return text && /^(Day|1|2|3|4|5|6|7)/.test(text);
+        });
+        if (hasNumbers) {
+          dataStartRow = i + 1;
+          break;
+        }
+      }
+    }
 
-    for (let rowIdx = 0; rowIdx < rows.length; rowIdx++) {
+    let currentMainCat: string | null = null;
+
+    for (let rowIdx = dataStartRow; rowIdx < rows.length; rowIdx++) {
       const row = rows[rowIdx];
       if (!row || row.length < 2) continue;
 
-      const mainCat = this.cleanText(row[0]);
-      const subCat = this.cleanText(row[1]);
+      const col0 = this.cleanText(row[0]);
+      const col1 = this.cleanText(row[1]);
 
-      if (mainCat) {
-        currentCategory = mainCat;
+      // Track main category
+      if (col0 && !col1) {
+        currentMainCat = col0;
+        continue;
       }
 
-      const categoryKey = subCat || currentCategory;
+      const categoryKey = col1 || col0 || currentMainCat;
       if (!categoryKey) continue;
 
-      // Breakfast data typically starts from column 2
-      for (let dayIdx = 1; dayIdx <= 28; dayIdx++) {
-        const colIdx = dayIdx + 1;
-        if (colIdx >= row.length) continue;
-
+      // Breakfast items start from column 2
+      // Assuming 4 weeks with 7 days each = 28 days
+      let itemCount = 0;
+      for (let colIdx = 2; colIdx < Math.min(row.length, 30); colIdx++) {
         const itemText = this.cleanText(row[colIdx]);
         if (itemText) {
-          this.addMenuItem(menuData.days[dayIdx], 'breakfast', categoryKey, itemText);
+          const dayNum = colIdx - 1; // Column 2 = Day 1, Column 3 = Day 2, etc.
+          if (dayNum >= 1 && dayNum <= 28) {
+            this.addMenuItem(menuData.days[dayNum], 'breakfast', categoryKey, itemText);
+            itemCount++;
+          }
         }
+      }
+
+      // If we found items, don't treat this as a category header next time
+      if (itemCount === 0 && col0) {
+        currentMainCat = col0;
       }
     }
   }
 
   private parseWeekSheet(rows: any[][], menuData: MenuData) {
-    let currentDay: number | null = null;
-    let currentMeal: 'lunch' | 'dinner' = 'lunch';
+    // Map to track: dayNum -> { lunch: colIdx, dinner: colIdx }
+    const dayMealColumns: Map<number, { lunch?: number; dinner?: number }> = new Map();
+    let contentStartRow = 0;
+
+    // First pass: Find day headers and meal type indicators
+    for (let rowIdx = 0; rowIdx < Math.min(10, rows.length); rowIdx++) {
+      const row = rows[rowIdx];
+      if (!row) continue;
+
+      let foundDayHeaders = false;
+      for (let colIdx = 0; colIdx < row.length; colIdx++) {
+        const cell = this.cleanText(row[colIdx]) || '';
+        const dayMatch = cell.match(/DAY\s*(\d+)/i);
+
+        if (dayMatch) {
+          const dayNum = parseInt(dayMatch[1]);
+          if (!dayMealColumns.has(dayNum)) {
+            dayMealColumns.set(dayNum, {});
+          }
+          foundDayHeaders = true;
+        }
+      }
+
+      // Look ahead one row for LUNCH/DINNER labels
+      if (foundDayHeaders && rowIdx + 1 < rows.length) {
+        const nextRow = rows[rowIdx + 1];
+        if (nextRow) {
+          for (let colIdx = 0; colIdx < Math.min(nextRow.length, row.length); colIdx++) {
+            const cell = this.cleanText(row[colIdx]) || '';
+            const dayMatch = cell.match(/DAY\s*(\d+)/i);
+
+            if (dayMatch) {
+              const dayNum = parseInt(dayMatch[1]);
+              const mealCell = this.cleanText(nextRow[colIdx]) || '';
+
+              if (mealCell.toUpperCase().includes('LUNCH')) {
+                const existing = dayMealColumns.get(dayNum) || {};
+                existing.lunch = colIdx;
+                dayMealColumns.set(dayNum, existing);
+              } else if (mealCell.toUpperCase().includes('DINNER')) {
+                const existing = dayMealColumns.get(dayNum) || {};
+                existing.dinner = colIdx;
+                dayMealColumns.set(dayNum, existing);
+              }
+            }
+          }
+        }
+        contentStartRow = rowIdx + 2;
+      }
+    }
+
+    // If no explicit lunch/dinner columns found, assume alternating or same column
+    if (dayMealColumns.size === 0) {
+      return; // No days found, skip this sheet
+    }
+
+    // Second pass: extract items
     let currentCategory: string | null = null;
 
-    for (let rowIdx = 0; rowIdx < rows.length; rowIdx++) {
+    for (let rowIdx = Math.max(contentStartRow, 5); rowIdx < rows.length; rowIdx++) {
       const row = rows[rowIdx];
-      if (!row || row.length < 1) continue;
+      if (!row || row.length === 0) continue;
 
-      // Check for day/meal headers
-      const firstCell = this.cleanText(row[0]) || '';
-      const upperFirst = firstCell.toUpperCase();
+      const firstCell = this.cleanText(row[0]);
 
-      if (upperFirst.includes('DAY')) {
-        const dayMatch = firstCell.match(/DAY\s*(\d+)/i);
-        if (dayMatch) {
-          currentDay = parseInt(dayMatch[1]);
-        }
+      // Skip empty rows and headers
+      if (!firstCell) continue;
+      if (firstCell.toUpperCase().includes('DAY') ||
+          firstCell.toUpperCase().includes('LUNCH') ||
+          firstCell.toUpperCase().includes('DINNER')) {
+        continue;
       }
 
-      if (upperFirst.includes('LUNCH')) {
-        currentMeal = 'lunch';
-      } else if (upperFirst.includes('DINNER')) {
-        currentMeal = 'dinner';
-      }
-
-      if (currentDay && (upperFirst.includes('BREAKFAST') || upperFirst.includes('LUNCH') || upperFirst.includes('DINNER'))) {
-        const mealMatch = firstCell.match(/(breakfast|lunch|dinner)/i);
-        if (mealMatch) {
-          currentMeal = mealMatch[1].toLowerCase() as 'lunch' | 'dinner';
-        }
-      }
-
-      // Check for category header
-      if (firstCell && !upperFirst.includes('DAY') && !upperFirst.includes('LUNCH') && !upperFirst.includes('DINNER')) {
+      // Detect category changes (first column has text, rest mostly empty = category header)
+      const nonEmptyCount = row.slice(1).filter(cell => this.cleanText(cell)).length;
+      if (firstCell && nonEmptyCount <= 2) {
         currentCategory = firstCell;
+        continue;
       }
 
-      // Add items
-      if (currentDay && currentCategory) {
-        for (let colIdx = 1; colIdx < row.length; colIdx++) {
-          const itemText = this.cleanText(row[colIdx]);
-          if (itemText) {
-            // Try to map column to a day
-            const dayToAdd = currentDay + (colIdx - 1);
-            if (dayToAdd >= 1 && dayToAdd <= 28) {
-              this.addMenuItem(menuData.days[dayToAdd], currentMeal, currentCategory, itemText);
+      // Extract items for this row across all days
+      if (currentCategory) {
+        for (const [dayNum, mealCols] of dayMealColumns.entries()) {
+          // Try lunch column
+          if (mealCols.lunch !== undefined && mealCols.lunch < row.length) {
+            const itemText = this.cleanText(row[mealCols.lunch]);
+            if (itemText) {
+              this.addMenuItem(menuData.days[dayNum], 'lunch', currentCategory, itemText);
+            }
+          }
+
+          // Try dinner column (might be same as lunch if not separated)
+          if (mealCols.dinner !== undefined && mealCols.dinner < row.length) {
+            const itemText = this.cleanText(row[mealCols.dinner]);
+            if (itemText && itemText !== this.cleanText(row[mealCols.lunch || mealCols.dinner])) {
+              this.addMenuItem(menuData.days[dayNum], 'dinner', currentCategory, itemText);
+            }
+          }
+
+          // If only one column per day, assume it applies to lunch
+          if (!mealCols.lunch && !mealCols.dinner) {
+            for (let colIdx = 1; colIdx < row.length; colIdx++) {
+              const itemText = this.cleanText(row[colIdx]);
+              if (itemText) {
+                this.addMenuItem(menuData.days[dayNum], 'lunch', currentCategory, itemText);
+              }
             }
           }
         }
