@@ -550,6 +550,56 @@ app.post('/api/roster/upload', upload.single('file'), (req, res) => {
     }
 });
 
+// Upload menu file (keeps only latest file)
+app.post('/api/menu/upload', upload.single('file'), (req, res) => {
+    try {
+        console.log('\n========== MENU UPLOAD REQUEST ==========');
+        console.log('📁 File received:', req.file?.originalname);
+
+        if (!req.file) {
+            console.error('❌ No file in request');
+            return res.status(400).json({ error: 'No file uploaded' });
+        }
+
+        const menuUploadsDir = path.join(__dirname, 'uploads', 'menu');
+        if (!fs.existsSync(menuUploadsDir)) {
+            fs.mkdirSync(menuUploadsDir, { recursive: true });
+        }
+
+        // Delete all existing menu files
+        const existingFiles = fs.readdirSync(menuUploadsDir);
+        for (const file of existingFiles) {
+            const filePath = path.join(menuUploadsDir, file);
+            fs.unlinkSync(filePath);
+            console.log('🗑️  Deleted old menu file:', file);
+        }
+
+        // Move the new file to menu directory
+        const newFilePath = path.join(menuUploadsDir, req.file.originalname);
+        fs.copyFileSync(req.file.path, newFilePath);
+        fs.unlinkSync(req.file.path);
+
+        console.log('✅ Menu file saved:', newFilePath);
+        console.log('========================================\n');
+
+        res.json({
+            success: true,
+            message: 'Menu file uploaded successfully',
+            filename: req.file.originalname,
+            uploadedAt: new Date().toISOString()
+        });
+
+    } catch (error) {
+        console.error('❌ Menu upload error:', error);
+        console.log('========================================\n');
+
+        res.status(500).json({
+            success: false,
+            error: error.message
+        });
+    }
+});
+
 // Get all schedules
 app.get('/api/schedules', (req, res) => {
     try {

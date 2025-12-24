@@ -15,11 +15,14 @@ interface ChatMessage {
 }
 
 export default function MenuAI({ isOpen, onClose }: MenuAIProps) {
+  const today = new Date();
+  const todayStr = today.toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+
   const [messages, setMessages] = useState<ChatMessage[]>([
     {
       id: '1',
       role: 'assistant',
-      content: 'Hello! I\'m your Menu AI assistant. Upload a menu file and ask me anything about what\'s being served. You can ask using day numbers (Day 5) or actual dates (December 15, Christmas, etc.). I can help with ingredients, allergens, dietary options, and more.',
+      content: `Hello! I'm your Menu AI assistant. Today is ${todayStr}.\n\nUpload a menu file and ask me anything about what's being served. You can ask using day numbers (Day 5) or actual dates (December 15, Christmas, etc.). I can help with ingredients, allergens, dietary options, and more.`,
       timestamp: new Date()
     }
   ]);
@@ -55,9 +58,15 @@ export default function MenuAI({ isOpen, onClose }: MenuAIProps) {
       menuAIService.setMenuData(menuData);
 
       const summary = menuAIService.getMenuSummary();
+      const todayDayNum = menuAIService.getTodaysDayNumber();
+      const todaysMenu = menuAIService.getCurrentMenu()?.days[todayDayNum];
+      const dateInfo = todaysMenu?.date_info;
+
+      const todayStr = dateInfo ? `Today is ${dateInfo.formatted}` : 'Menu loaded';
+
       addMessage({
         role: 'assistant',
-        content: `Perfect! ${summary}\n\nI now have access to the complete menu. You can ask me:\n- What's for breakfast/lunch/dinner on a specific day\n- What items contain specific allergens\n- What vegetarian/vegan options are available\n- What's being served around holidays or special dates\n\nWhat would you like to know?`
+        content: `Perfect! ${summary}\n\n${todayStr}\n\nI now have access to the complete menu. You can ask me:\n- What's for breakfast/lunch/dinner on a specific day\n- What items contain specific allergens\n- What vegetarian/vegan options are available\n- What's being served around holidays or special dates\n\nWhat would you like to know?`
       });
 
       setIsMenuLoaded(true);

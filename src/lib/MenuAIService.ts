@@ -91,6 +91,44 @@ class MenuAIService {
     return this.currentMenu;
   }
 
+  getTodaysDayNumber(): number {
+    if (!this.currentMenu) return 1;
+    const today = new Date();
+    const dateMapping = this.currentMenu.date_mapping || this.defaultDateMapping;
+
+    for (const [dayStr, dateInfo] of Object.entries(dateMapping)) {
+      const dayNum = parseInt(dayStr);
+      const date = new Date(today.getFullYear(), this.getMonthIndex(dateInfo.month), dateInfo.day);
+
+      if (date.getDate() === today.getDate() &&
+          date.getMonth() === today.getMonth()) {
+        return dayNum;
+      }
+    }
+
+    return 1;
+  }
+
+  private getMonthIndex(monthName: string): number {
+    const months: Record<string, number> = {
+      'January': 0, 'February': 1, 'March': 2, 'April': 3,
+      'May': 4, 'June': 5, 'July': 6, 'August': 7,
+      'September': 8, 'October': 9, 'November': 10, 'December': 11
+    };
+    return months[monthName] || 0;
+  }
+
+  getTodaysMenu(): MenuData | null {
+    if (!this.currentMenu) return null;
+    const dayNum = this.getTodaysDayNumber();
+    return {
+      ...this.currentMenu,
+      days: {
+        [dayNum]: this.currentMenu.days[dayNum]
+      }
+    };
+  }
+
   private extractAllergens(text: string): { allergens: string[] | null; cleanName: string } {
     const allergenMatch = text.match(/\(([A-Z,\s]+)\)\s*$/);
     if (allergenMatch) {
@@ -113,11 +151,21 @@ class MenuAIService {
       .map(([day, info]) => `- Day ${day} = ${info.formatted}`)
       .join('\n');
 
+    const todayDayNum = this.getTodaysDayNumber();
+    const todayDateInfo = dateMapping[String(todayDayNum)];
+    const todayDateStr = todayDateInfo ? `Today is Day ${todayDayNum} (${todayDateInfo.formatted})` : `Today's menu is available`;
+
     const menuDataJson = JSON.stringify(this.currentMenu.days, null, 2);
 
     this.systemPrompt = `# TROJENA Menu Assistant (with Date Support)
 
 You are a menu assistant for TROJENA's 28-Day Menu Cycle. You can answer questions using EITHER day numbers OR actual dates.
+
+## TODAY'S DATE
+
+${todayDateStr}
+
+When users ask "what's for today" or "today's menu", refer to this date.
 
 ## DATE MAPPING
 
